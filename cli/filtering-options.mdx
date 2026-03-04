@@ -1,0 +1,325 @@
+---
+title: Filtering options
+description: Control which issues and analyzers are included in Retina reports
+---
+
+Retina provides powerful filtering options to customize which issues appear in your analysis reports. Filters can be applied via CLI options or configuration files.
+
+## Overview
+
+Filtering helps you focus on relevant issues by:
+
+- Excluding entire categories of issues (e.g., all unused code warnings)
+- Disabling specific analyzers (e.g., deprecated API checks)
+- Hiding issues by severity level (e.g., info and hints)
+
+<Note>
+  CLI filter options override configuration file settings. If you specify a filter via CLI, the corresponding config file setting is ignored.
+</Note>
+
+## Category filtering
+
+<ParamField path="--exclude-categories" type="string">
+  Comma-separated list of issue categories to exclude from reports.
+  
+  ```bash
+  retina run --exclude-categories unused,undefined
+  retina run --exclude-categories unused_variable,unused_import
+  ```
+</ParamField>
+
+### Available category presets
+
+<Accordion title="unused preset">
+  Excludes all unused code warnings:
+  - `unused_variable`
+  - `unused_parameter`
+  - `unused_import`
+  - Dead code warnings
+  
+  ```bash
+  retina run --exclude-categories unused
+  ```
+</Accordion>
+
+<Accordion title="undefined preset">
+  Excludes all undefined reference warnings:
+  - `undefined_variable`
+  - `undefined_method`
+  - `undefined_class`
+  - `undefined_constant`
+  - `undefined_function`
+  
+  ```bash
+  retina run --exclude-categories undefined
+  ```
+</Accordion>
+
+<Accordion title="pocketmine preset">
+  Excludes PocketMine-MP specific issues:
+  - Plugin.yml validation errors
+  - Event handler issues
+  - API version problems
+  - Thread safety violations
+  - And other PocketMine-specific checks
+  
+  ```bash
+  retina run --exclude-categories pocketmine
+  ```
+</Accordion>
+
+### Individual categories
+
+You can also exclude specific individual categories:
+
+```bash
+retina run --exclude-categories unused_variable,unused_import
+```
+
+### Configuration file
+
+In `retina.yml`:
+
+```yaml
+excludeCategories:
+  - unused_variable
+  - unused_import
+```
+
+Or using presets:
+
+```yaml
+excludeCategories:
+  - unused
+  - undefined
+```
+
+## Analyzer filtering
+
+<ParamField path="--exclude-analyzers" type="string">
+  Comma-separated list of analyzers to disable during analysis.
+  
+  ```bash
+  retina run --exclude-analyzers DeprecatedApi,ThreadSafety
+  ```
+</ParamField>
+
+### Available analyzers
+
+<Accordion title="PHP file analyzers">
+  - **PhpFile** - General PHP file structure and syntax
+  - **PHPStan** - Advanced static analysis engine
+</Accordion>
+
+<Accordion title="PocketMine-MP core analyzers">
+  - **PluginYml** - Validates plugin.yml structure and content
+  - **MainClass** - Checks main plugin class implementation
+  - **EventHandler** - Validates event handler methods
+  - **Listener** - Checks listener class registration
+  - **Command** - Validates command implementations
+  - **Permission** - Checks permission definitions
+</Accordion>
+
+<Accordion title="PocketMine-MP advanced analyzers">
+  - **AsyncTask** - Detects async task misuse and thread safety issues
+  - **Scheduler** - Validates scheduler usage patterns
+  - **Config** - Checks configuration file handling
+  - **Resource** - Validates resource file access
+  - **DeprecatedApi** - Detects usage of deprecated PocketMine-MP APIs
+  - **ThreadSafety** - Identifies thread safety violations
+</Accordion>
+
+### Examples
+
+Disable deprecated API warnings:
+
+```bash
+retina run --exclude-analyzers DeprecatedApi
+```
+
+Disable multiple analyzers:
+
+```bash
+retina run --exclude-analyzers DeprecatedApi,ThreadSafety,PHPStan
+```
+
+### Configuration file
+
+In `retina.yml`:
+
+```yaml
+excludeAnalyzers:
+  - DeprecatedApi
+  - ThreadSafety
+```
+
+<Warning>
+  Disabling core analyzers like `PluginYml` or `MainClass` may cause Retina to miss critical plugin structure issues.
+</Warning>
+
+## Severity filtering
+
+<ParamField path="--exclude-severities" type="string">
+  Comma-separated list of severity levels to exclude from reports.
+  
+  Valid severity levels: `error`, `warning`, `info`, `hint`
+  
+  ```bash
+  retina run --exclude-severities info,hint
+  ```
+</ParamField>
+
+### Severity levels
+
+<Accordion title="error">
+  Critical issues that will likely cause runtime failures or crashes. These should always be fixed before deployment.
+  
+  Examples:
+  - Undefined variables or methods
+  - Type mismatches
+  - Invalid plugin.yml structure
+</Accordion>
+
+<Accordion title="warning">
+  Issues that may cause unexpected behavior or are considered bad practices.
+  
+  Examples:
+  - Unused variables
+  - Missing return types
+  - Deprecated API usage
+</Accordion>
+
+<Accordion title="info">
+  Informational messages about potential improvements or style recommendations.
+  
+  Examples:
+  - Code style suggestions
+  - Performance optimization hints
+</Accordion>
+
+<Accordion title="hint">
+  Minor suggestions that may improve code quality but are not critical.
+  
+  Examples:
+  - Documentation suggestions
+  - Alternative implementation hints
+</Accordion>
+
+### Examples
+
+Show only errors and warnings:
+
+```bash
+retina run --exclude-severities info,hint
+```
+
+Show only errors:
+
+```bash
+retina run --exclude-severities warning,info,hint
+```
+
+### Configuration file
+
+In `retina.yml`:
+
+```yaml
+excludeSeverities:
+  - info
+  - hint
+```
+
+## Combining filters
+
+You can combine multiple filter types for precise control:
+
+```bash
+retina run \
+  --exclude-categories unused \
+  --exclude-analyzers DeprecatedApi,ThreadSafety \
+  --exclude-severities info,hint
+```
+
+In `retina.yml`:
+
+```yaml
+excludeCategories:
+  - unused
+  - undefined
+
+excludeAnalyzers:
+  - DeprecatedApi
+  - ThreadSafety
+
+excludeSeverities:
+  - info
+  - hint
+```
+
+## Filter precedence
+
+<Note>
+  CLI options take precedence over configuration file settings:
+  
+  1. CLI filter options (highest priority)
+  2. `retina.yml` configuration file
+  3. Default settings (no filters)
+</Note>
+
+If you specify a filter via CLI, the entire corresponding config file setting is replaced:
+
+```bash
+# Config file has excludeCategories: [unused, undefined]
+# CLI option completely replaces it:
+retina run --exclude-categories pocketmine
+# Result: Only 'pocketmine' is excluded, not 'unused' or 'undefined'
+```
+
+## Validation
+
+Retina validates filter configurations before running analysis:
+
+- Invalid category names will cause an error
+- Invalid analyzer names will cause an error  
+- Invalid severity levels will cause an error
+- Typos in preset names will not match and may cause unexpected results
+
+<Warning>
+  If filter validation fails, Retina will display an error message and exit without running analysis.
+</Warning>
+
+## Use cases
+
+<Accordion title="Focus on critical errors only">
+  ```bash
+  retina run --exclude-severities warning,info,hint
+  ```
+</Accordion>
+
+<Accordion title="Ignore legacy code warnings">
+  ```bash
+  retina run --exclude-categories unused,undefined --exclude-analyzers DeprecatedApi
+  ```
+</Accordion>
+
+<Accordion title="CI/CD pipeline - errors and warnings only">
+  ```bash
+  retina run \
+    --exclude-severities info,hint \
+    --console-only \
+    --no-progress
+  ```
+</Accordion>
+
+<Accordion title="New plugin development - all checks enabled">
+  ```bash
+  retina run --level 9
+  # No filters, all analyzers and severities included
+  ```
+</Accordion>
+
+<Accordion title="Gradual adoption - start with PocketMine-specific checks">
+  ```bash
+  retina run --exclude-analyzers PHPStan --exclude-categories unused,undefined
+  ```
+</Accordion>

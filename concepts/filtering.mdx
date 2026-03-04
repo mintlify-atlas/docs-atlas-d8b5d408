@@ -1,0 +1,423 @@
+---
+title: Filtering
+description: Learn how to filter Retina analysis results using category presets, analyzer exclusions, and severity filters
+---
+
+Retina provides powerful filtering options to help you focus on the issues that matter most to your project. You can filter by category, analyzer, and severity level using both command-line options and configuration files.
+
+## Filtering overview
+
+Retina supports three types of filtering:
+
+<CardGroup cols={3}>
+  <Card title="Categories" icon="tags">
+    Exclude specific issue types
+  </Card>
+  <Card title="Analyzers" icon="magnifying-glass">
+    Disable entire analyzers
+  </Card>
+  <Card title="Severities" icon="signal">
+    Hide severity levels
+  </Card>
+</CardGroup>
+
+## Category filtering
+
+Exclude specific issue categories from your analysis results.
+
+### Using command-line options
+
+```bash
+retina run --exclude-categories=unused_variable,unused_import
+```
+
+### Using configuration file
+
+```yaml retina.yml
+excludeCategories:
+  - unused_variable
+  - unused_import
+  - dead_code
+```
+
+### Available categories
+
+See the complete list of categories in the [Issue categories](/concepts/issue-categories) documentation.
+
+**PHP standard categories:**
+- undefined_variable, undefined_method, undefined_class, undefined_constant, undefined_function, undefined_property
+- type_mismatch, return_type, parameter_type
+- unused_variable, unused_parameter, unused_import
+- dead_code, syntax_error
+- missing_return, invalid_inheritance, interface_violation, abstract_violation, visibility_violation
+- static_call_error, instantiation_error, array_access_error, null_safety
+
+**PocketMine-MP categories:**
+- invalid_event_handler, unregistered_listener, invalid_plugin_yml, main_class_mismatch, invalid_api_version
+- deprecated_api, async_task_misuse, scheduler_misuse, config_misuse
+- permission_mismatch, command_mismatch, resource_missing
+- invalid_event_priority, cancelled_event_access, thread_safety
+
+## Category presets
+
+Presets allow you to exclude multiple related categories at once.
+
+### Available presets
+
+<Accordion title="unused preset">
+Excludes all unused code issues:
+- unused_variable
+- unused_parameter
+- unused_import
+
+```bash
+retina run --exclude-categories=unused
+```
+</Accordion>
+
+<Accordion title="undefined preset">
+Excludes all undefined reference issues:
+- undefined_variable
+- undefined_method
+- undefined_class
+- undefined_constant
+- undefined_function
+- undefined_property
+
+```bash
+retina run --exclude-categories=undefined
+```
+</Accordion>
+
+<Accordion title="pocketmine preset">
+Excludes all PocketMine-MP specific issues:
+- invalid_event_handler
+- unregistered_listener
+- invalid_plugin_yml
+- main_class_mismatch
+- invalid_api_version
+- deprecated_api
+- async_task_misuse
+- scheduler_misuse
+- config_misuse
+- permission_mismatch
+- command_mismatch
+- resource_missing
+- invalid_event_priority
+- cancelled_event_access
+- thread_safety
+
+```bash
+retina run --exclude-categories=pocketmine
+```
+</Accordion>
+
+### Combining presets and categories
+
+You can mix presets with specific categories:
+
+```bash
+retina run --exclude-categories=unused,deprecated_api
+```
+
+```yaml retina.yml
+excludeCategories:
+  - unused              # Preset: all unused issues
+  - undefined           # Preset: all undefined issues
+  - deprecated_api      # Specific category
+  - thread_safety       # Specific category
+```
+
+<Note>
+Presets are expanded before validation, so `unused` becomes `unused_variable`, `unused_parameter`, and `unused_import`.
+</Note>
+
+**Source reference:**
+- Preset expansion: src/Filter/FilterConfig.php:102
+- Preset definitions: FilterConfig::getUnusedCategories(), getUndefinedCategories(), getPocketMineCategories()
+
+## Analyzer filtering
+
+Disable entire analyzers to skip specific types of analysis.
+
+### Using command-line options
+
+```bash
+retina run --exclude-analyzers=DeprecatedApi,ThreadSafety
+```
+
+### Using configuration file
+
+```yaml retina.yml
+excludeAnalyzers:
+  - DeprecatedApi
+  - ThreadSafety
+  - PHPStan
+```
+
+### Available analyzers
+
+- PluginYml
+- MainClass
+- PhpFile
+- EventHandler
+- Listener
+- Command
+- Permission
+- AsyncTask
+- Scheduler
+- Config
+- Resource
+- DeprecatedApi
+- ThreadSafety
+- PHPStan
+
+See [Analyzers](/concepts/analyzers) for detailed information about each analyzer.
+
+### Analyzer name flexibility
+
+Retina normalizes analyzer names, so these are all equivalent:
+
+```bash
+retina run --exclude-analyzers=DeprecatedApi
+retina run --exclude-analyzers=DeprecatedApiAnalyzer
+retina run --exclude-analyzers=deprecatedapi
+retina run --exclude-analyzers=deprecated-api
+```
+
+<Note>
+Analyzer names are case-insensitive and the "Analyzer" suffix is optional.
+</Note>
+
+**Source reference:**
+- Name normalization: src/Filter/FilterConfig.php:231
+
+### Common use cases
+
+**Legacy codebase:**
+```bash
+# Skip deprecated API checks while migrating
+retina run --exclude-analyzers=DeprecatedApi
+```
+
+**Quick scan:**
+```bash
+# Skip expensive PHPStan analysis for faster results
+retina run --exclude-analyzers=PHPStan
+```
+
+**Single-threaded plugins:**
+```bash
+# Skip thread safety if not using AsyncTask
+retina run --exclude-analyzers=ThreadSafety,AsyncTask
+```
+
+<Warning>
+You cannot exclude all analyzers. At least one analyzer must remain active.
+</Warning>
+
+## Severity filtering
+
+Exclude specific severity levels to focus on critical issues.
+
+### Using command-line options
+
+```bash
+retina run --exclude-severities=info,hint
+```
+
+### Using configuration file
+
+```yaml retina.yml
+excludeSeverities:
+  - info
+  - hint
+```
+
+### Available severity levels
+
+- error - Critical issues that will cause crashes
+- warning - Problems that should be fixed
+- info - Suggestions for improvement
+- hint - Minor style or optimization suggestions
+
+See [Severity levels](/concepts/severity-levels) for detailed information.
+
+### Common filtering strategies
+
+**Production deployments:**
+```bash
+# Only show errors - must fix before deploy
+retina run --exclude-severities=warning,info,hint
+```
+
+**CI/CD pipeline:**
+```bash
+# Errors and warnings only
+retina run --exclude-severities=info,hint
+```
+
+**Development:**
+```bash
+# Show everything for comprehensive review
+retina run
+```
+
+**Code review:**
+```bash
+# Hide hints to focus on substantial issues
+retina run --exclude-severities=hint
+```
+
+<Warning>
+You cannot exclude all severity levels. At least one severity must be shown.
+</Warning>
+
+## Filter validation
+
+Retina validates all filter configurations and provides helpful error messages.
+
+### Invalid category example
+
+```bash
+retina run --exclude-categories=unused_varaible
+# Error: Invalid category: "unused_varaible"
+# Did you mean: "unused_variable", "unused_parameter", "unused_import"
+```
+
+### Invalid analyzer example
+
+```bash
+retina run --exclude-analyzers=DeprecatedAPI
+# Error: Invalid analyzer: "DeprecatedAPI"
+# Available analyzers: PluginYml, MainClass, PhpFile, ...
+```
+
+### Invalid severity example
+
+```bash
+retina run --exclude-severities=critical
+# Error: Invalid severity: "critical"
+# Valid severities: error, warning, info, hint
+```
+
+**Source reference:**
+- Validation logic: src/Filter/FilterConfig.php:95
+- Category validation with suggestions: FilterConfig::validateCategories() (uses Levenshtein distance)
+
+## Configuration precedence
+
+When using both command-line options and configuration files, command-line options take precedence.
+
+### Example scenario
+
+```yaml retina.yml
+excludeCategories:
+  - unused_variable
+  - dead_code
+```
+
+```bash
+retina run --exclude-categories=deprecated_api
+# Result: Only deprecated_api is excluded
+# The config file settings are overridden
+```
+
+<Note>
+Command-line options completely override configuration file settings - they don't merge.
+</Note>
+
+**Source reference:**
+- Configuration merging: src/Command/RunCommand.php:240
+
+## Combining multiple filters
+
+You can use all three filter types together for precise control.
+
+### Command-line example
+
+```bash
+retina run \
+  --exclude-categories=unused,undefined \
+  --exclude-analyzers=PHPStan \
+  --exclude-severities=hint
+```
+
+### Configuration file example
+
+```yaml retina.yml
+level: 7
+reportFormat: md
+
+excludeCategories:
+  - unused              # All unused code
+  - undefined           # All undefined references
+  - deprecated_api      # Deprecated API usage
+
+excludeAnalyzers:
+  - PHPStan             # Skip PHPStan for faster scans
+  - DeprecatedApi       # Skip deprecated API checks
+
+excludeSeverities:
+  - info                # Hide informational messages
+  - hint                # Hide minor hints
+```
+
+## Filtering workflow examples
+
+### Initial scan: Focus on critical issues
+
+```bash
+retina run \
+  --exclude-severities=info,hint \
+  --exclude-categories=unused
+```
+
+This shows only errors and warnings, excluding unused code issues.
+
+### Pre-production scan: Everything except hints
+
+```bash
+retina run --exclude-severities=hint
+```
+
+### Migration scan: Skip deprecated API temporarily
+
+```bash
+retina run \
+  --exclude-analyzers=DeprecatedApi \
+  --exclude-severities=hint
+```
+
+### Quick validation: Structure only
+
+```bash
+retina run \
+  --exclude-analyzers=PHPStan,DeprecatedApi,ThreadSafety \
+  --exclude-severities=info,hint
+```
+
+## Simple reports
+
+Simple reports show minimal information (file, line, category, severity, message) without code snippets or suggestions.
+
+### Enable simple reports
+
+```bash
+retina run --simple
+```
+
+```yaml retina.yml
+simpleReport: true
+```
+
+**Source reference:**
+- Simple report configuration: src/Filter/FilterConfig.php:75
+- Simple formatters: src/Report/Format/Simple/
+
+## Related resources
+
+- [Analyzers](/concepts/analyzers)
+- [Issue categories](/concepts/issue-categories)
+- [Severity levels](/concepts/severity-levels)
+- [Configuration reference](/configuration/retina-yml)

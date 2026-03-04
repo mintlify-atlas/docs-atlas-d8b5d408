@@ -1,0 +1,187 @@
+---
+title: retina run
+description: Scan a PocketMine-MP plugin for errors and issues
+---
+
+The `retina run` command is the primary analysis command that scans your PocketMine-MP plugin directory to detect errors, issues, and potential problems.
+
+## Basic usage
+
+```bash
+retina run
+```
+
+By default, this scans the current directory and generates a Markdown report.
+
+## Arguments
+
+<ParamField path="directory" type="string" default=".">
+  Path to the plugin directory to scan. If not specified, scans the current directory.
+  
+  ```bash
+  retina run /path/to/plugin
+  ```
+</ParamField>
+
+## Options
+
+### Analysis options
+
+<ParamField path="--level" type="integer" default="6">
+  Analysis strictness level ranging from 1 to 9, where higher values apply stricter analysis rules.
+  
+  ```bash
+  retina run --level 8
+  retina run -l 9
+  ```
+  
+  <Note>
+    Level 6 is recommended for most plugins. Use higher levels for critical plugins that require stricter analysis.
+  </Note>
+</ParamField>
+
+### Output format options
+
+<ParamField path="--format" type="string" default="md">
+  Output format for the generated report. Available formats:
+  - `md` - Markdown report (default)
+  - `json` - JSON structured data
+  - `txt` - Plain text report
+  - `html` - HTML web-based report
+  
+  ```bash
+  retina run --format json
+  retina run -f html
+  ```
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Custom output file path. If not specified, defaults to `retina-report.<format>` in the scanned directory.
+  
+  ```bash
+  retina run --output reports/analysis.md
+  retina run -o /tmp/report.json
+  ```
+</ParamField>
+
+<ParamField path="--console-only" type="boolean">
+  Output results to console only without generating a report file.
+  
+  ```bash
+  retina run --console-only
+  retina run -c
+  ```
+  
+  <Note>
+    Useful for CI/CD pipelines where you only need exit codes and console output.
+  </Note>
+</ParamField>
+
+<ParamField path="--simple" type="boolean">
+  Generate a simplified report without code snippets and suggestions. Simple reports include only file paths, line numbers, categories, severity levels, and messages.
+  
+  ```bash
+  retina run --simple
+  retina run -s
+  ```
+</ParamField>
+
+<ParamField path="--no-progress" type="boolean">
+  Disable progress output during analysis.
+  
+  ```bash
+  retina run --no-progress
+  ```
+</ParamField>
+
+### Filtering options
+
+<ParamField path="--exclude-categories" type="string">
+  Comma-separated list of issue categories to exclude from the report.
+  
+  ```bash
+  retina run --exclude-categories unused,undefined
+  retina run --exclude-categories unused_variable,unused_import
+  ```
+  
+  See [Filtering options](/cli/filtering-options) for available categories and presets.
+</ParamField>
+
+<ParamField path="--exclude-analyzers" type="string">
+  Comma-separated list of analyzers to disable during analysis.
+  
+  ```bash
+  retina run --exclude-analyzers DeprecatedApi,ThreadSafety
+  retina run --exclude-analyzers PHPStan
+  ```
+  
+  See [Filtering options](/cli/filtering-options) for available analyzers.
+</ParamField>
+
+<ParamField path="--exclude-severities" type="string">
+  Comma-separated list of severity levels to exclude from the report.
+  
+  ```bash
+  retina run --exclude-severities info,hint
+  retina run --exclude-severities hint
+  ```
+  
+  Valid severity levels: `error`, `warning`, `info`, `hint`
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+```bash Quick scan
+retina run
+```
+
+```bash High strictness analysis
+retina run --level 9
+```
+
+```bash JSON output for CI/CD
+retina run --format json --output report.json
+```
+
+```bash Console-only output
+retina run --console-only --no-progress
+```
+
+```bash Simplified report
+retina run --simple --format txt
+```
+
+```bash Exclude unused code warnings
+retina run --exclude-categories unused
+```
+
+```bash Multiple filters
+retina run --exclude-severities info,hint --exclude-analyzers DeprecatedApi
+```
+
+```bash Specific directory with custom output
+retina run /path/to/plugin --output /reports/plugin-analysis.md
+```
+</CodeGroup>
+
+## Requirements
+
+<Warning>
+  The scanned directory must contain a `plugin.yml` file. Retina will exit with an error if no `plugin.yml` is found.
+</Warning>
+
+## Configuration file
+
+CLI options override settings from `retina.yml` configuration files. If a `retina.yml` exists in the scanned directory, Retina will:
+
+1. Load default settings from `retina.yml`
+2. Override with any CLI options provided
+3. Use CLI filtering options if specified, otherwise fall back to config file filters
+
+See the [init command](/cli/init) to generate a default configuration file.
+
+## Exit codes
+
+- `0` - Success, no issues found
+- `1` - Failure, issues found or scan error occurred

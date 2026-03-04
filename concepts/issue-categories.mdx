@@ -1,0 +1,432 @@
+---
+title: Issue categories
+description: Complete reference of all issue categories detected by Retina, organized by PHP standard issues and PocketMine-MP specific issues
+---
+
+Retina categorizes all detected issues into specific categories to help you understand the nature and impact of each problem. Issues fall into two main groups: PHP standard issues and PocketMine-MP specific issues.
+
+## PHP standard issues
+
+These categories cover general PHP programming errors and code quality issues that apply to any PHP project.
+
+### Undefined issues
+
+Issues related to using code elements before they are defined.
+
+<CardGroup cols={2}>
+  <Card title="undefined_variable" icon="question">
+    Variable used before definition
+  </Card>
+  <Card title="undefined_method" icon="question">
+    Method doesn't exist
+  </Card>
+  <Card title="undefined_class" icon="question">
+    Class not found
+  </Card>
+  <Card title="undefined_constant" icon="question">
+    Constant not defined
+  </Card>
+  <Card title="undefined_function" icon="question">
+    Function doesn't exist
+  </Card>
+  <Card title="undefined_property" icon="question">
+    Property doesn't exist
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+echo $username; // undefined_variable: $username used before definition
+
+$result = $object->nonexistentMethod(); // undefined_method
+
+new \App\Models\MissingClass(); // undefined_class
+```
+
+<Note>
+You can exclude all undefined issues at once using the `undefined` preset. See [Filtering](/concepts/filtering) for details.
+</Note>
+
+### Type issues
+
+Issues related to type mismatches and type safety violations.
+
+<CardGroup cols={2}>
+  <Card title="type_mismatch" icon="code-compare">
+    Type doesn't match expected type
+  </Card>
+  <Card title="return_type" icon="arrow-turn-down-left">
+    Return type error
+  </Card>
+  <Card title="parameter_type" icon="brackets-curly">
+    Parameter type error
+  </Card>
+  <Card title="null_safety" icon="ban">
+    Potential null pointer issue
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+function getCount(): int {
+    return "five"; // return_type: Expected int, got string
+}
+
+function processPlayer(Player $player): void {
+    processPlayer("username"); // parameter_type: Expected Player, got string
+}
+
+$player = $server->getPlayerExact("notfound");
+$player->sendMessage("hi"); // null_safety: $player might be null
+```
+
+### Unused code
+
+Code elements that are declared but never used.
+
+<CardGroup cols={2}>
+  <Card title="unused_variable" icon="trash">
+    Variable declared but never used
+  </Card>
+  <Card title="unused_parameter" icon="trash">
+    Parameter never used
+  </Card>
+  <Card title="unused_import" icon="trash">
+    Import statement not needed
+  </Card>
+  <Card title="dead_code" icon="skull">
+    Unreachable code
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+use App\Models\UnusedClass; // unused_import
+
+function calculate(int $x, int $y): int {
+    $temp = $x * 2; // unused_variable: $temp is never used
+    return $x + $y;
+}
+
+function process(string $name, bool $debug): void {
+    // unused_parameter: $debug is never referenced
+    echo $name;
+}
+
+return true;
+echo "This will never run"; // dead_code: unreachable
+```
+
+<Note>
+You can exclude all unused code issues using the `unused` preset. See [Filtering](/concepts/filtering) for details.
+</Note>
+
+### Syntax and structure
+
+Issues related to PHP syntax errors and structural problems.
+
+<CardGroup cols={2}>
+  <Card title="syntax_error" icon="circle-exclamation">
+    PHP syntax error
+  </Card>
+  <Card title="missing_return" icon="arrow-turn-down-left">
+    Missing return statement
+  </Card>
+  <Card title="invalid_inheritance" icon="diagram-project">
+    Invalid class inheritance
+  </Card>
+  <Card title="interface_violation" icon="file-contract">
+    Interface not properly implemented
+  </Card>
+  <Card title="abstract_violation" icon="file-dashed">
+    Abstract class violation
+  </Card>
+  <Card title="visibility_violation" icon="eye-slash">
+    Visibility modifier error
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+function getName(): string {
+    // missing_return: No return statement
+}
+
+class MyClass extends FinalClass { // invalid_inheritance: Cannot extend final class
+}
+
+class Handler implements Listener {
+    // interface_violation: Missing required method handleEvent()
+}
+```
+
+### Method and property access
+
+Issues related to accessing methods and properties incorrectly.
+
+<CardGroup cols={2}>
+  <Card title="static_call_error" icon="s">
+    Static method call error
+  </Card>
+  <Card title="instantiation_error" icon="plus">
+    Cannot instantiate class
+  </Card>
+  <Card title="array_access_error" icon="brackets-square">
+    Invalid array access
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+MyClass::nonStaticMethod(); // static_call_error: Method is not static
+
+$obj = new AbstractClass(); // instantiation_error: Cannot instantiate abstract class
+
+$value = "string"[100]; // array_access_error: Invalid offset
+```
+
+## PocketMine-MP specific issues
+
+These categories are specific to PocketMine-MP plugin development and cover API usage, threading, and plugin structure.
+
+### Plugin structure
+
+Issues related to plugin configuration and main class setup.
+
+<CardGroup cols={2}>
+  <Card title="invalid_plugin_yml" icon="file-code">
+    plugin.yml has errors
+  </Card>
+  <Card title="main_class_mismatch" icon="file-lines">
+    Main class doesn't match plugin.yml
+  </Card>
+  <Card title="invalid_api_version" icon="code-branch">
+    API version format invalid
+  </Card>
+</CardGroup>
+
+**Example:**
+```yaml
+# invalid_plugin_yml: Missing required field
+name: MyPlugin
+version: 1.0.0
+# ERROR: 'main' field is required
+
+# invalid_api_version: Wrong format
+api: 5.0  # Should be 5.0.0
+```
+
+**Source reference:**
+- Detected by: PluginYmlAnalyzer (src/Analyzer/PluginYmlAnalyzer.php:14)
+- Main class validation: MainClassAnalyzer (src/Analyzer/MainClassAnalyzer.php:26)
+
+### Event handling
+
+Issues related to event listeners and handlers.
+
+<CardGroup cols={2}>
+  <Card title="invalid_event_handler" icon="bolt">
+    Event handler signature wrong
+  </Card>
+  <Card title="unregistered_listener" icon="ear-listen">
+    Listener not registered
+  </Card>
+  <Card title="invalid_event_priority" icon="arrow-up-1-9">
+    Event priority invalid
+  </Card>
+  <Card title="cancelled_event_access" icon="ban">
+    Accessing cancelled event incorrectly
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+class MyListener implements Listener {
+    private function onJoin(PlayerJoinEvent $event) {
+        // invalid_event_handler: Must be public
+    }
+    
+    /**
+     * @priority INVALID
+     */
+    public function onQuit(PlayerQuitEvent $event) {
+        // invalid_event_priority: Valid priorities are LOWEST, LOW, NORMAL, HIGH, HIGHEST, MONITOR
+    }
+}
+```
+
+**Valid event priorities:**
+- LOWEST
+- LOW
+- NORMAL
+- HIGH
+- HIGHEST
+- MONITOR
+
+**Source reference:**
+- Detected by: EventHandlerAnalyzer (src/Analyzer/EventHandlerAnalyzer.php:13)
+
+### API deprecation
+
+Issues related to using deprecated PocketMine-MP APIs.
+
+<CardGroup cols={1}>
+  <Card title="deprecated_api" icon="triangle-exclamation">
+    Using deprecated PocketMine-MP API
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+// deprecated_api: getLevel() deprecated since API 4.0.0
+$level = $server->getLevel($name);
+// Use: $world = $server->getWorldManager()->getWorldByName($name);
+
+// deprecated_api: addTitle() deprecated since API 4.0.0
+$player->addTitle("Title");
+// Use: $player->sendTitle("Title");
+
+// deprecated_api: sendPopup() deprecated since API 5.0.0
+$player->sendPopup("Message");
+// Use: $player->sendToastNotification("Message");
+```
+
+**Source reference:**
+- Detected by: DeprecatedApiAnalyzer
+- Tracks 74+ deprecated methods, 8+ deprecated classes
+- Covers API versions 3.x, 4.x, and 5.x
+
+### Threading and async
+
+Issues related to AsyncTasks and thread safety.
+
+<CardGroup cols={2}>
+  <Card title="async_task_misuse" icon="clock">
+    AsyncTask used incorrectly
+  </Card>
+  <Card title="thread_safety" icon="shield-halved">
+    Thread safety violation
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        $server = $this->getServer();
+        // async_task_misuse & thread_safety: Thread-unsafe call to getServer()
+        
+        static $counter = 0;
+        // thread_safety: Static variable in async context is thread-unsafe
+        
+        $data = $_SERVER['HTTP_HOST'];
+        // thread_safety: Superglobal access in async context
+    }
+}
+```
+
+<Warning>
+Thread safety violations can cause random crashes and data corruption. Always fix these issues before deploying your plugin.
+</Warning>
+
+**Source reference:**
+- Detected by: AsyncTaskAnalyzer (src/Analyzer/AsyncTaskAnalyzer.php:15)
+- Detected by: ThreadSafetyAnalyzer (src/Analyzer/ThreadSafetyAnalyzer.php:15)
+
+### Scheduler and tasks
+
+Issues related to task scheduling.
+
+<CardGroup cols={1}>
+  <Card title="scheduler_misuse" icon="clock">
+    Scheduler used incorrectly
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+// scheduler_misuse: Invalid delay value
+$scheduler->scheduleDelayedTask($task, -1);
+
+// scheduler_misuse: Task scheduled after plugin disable
+```
+
+### Configuration and resources
+
+Issues related to config files and plugin resources.
+
+<CardGroup cols={2}>
+  <Card title="config_misuse" icon="gear">
+    Config handling error
+  </Card>
+  <Card title="resource_missing" icon="folder">
+    Resource file not found
+  </Card>
+</CardGroup>
+
+**Example:**
+```php
+// config_misuse: No default value for missing key
+$value = $config->get("missing_key"); // May return null
+
+// resource_missing: Resource file doesn't exist
+$this->saveResource("nonexistent.yml");
+```
+
+### Commands and permissions
+
+Issues related to command and permission definitions.
+
+<CardGroup cols={2}>
+  <Card title="command_mismatch" icon="terminal">
+    Command definition mismatch
+  </Card>
+  <Card title="permission_mismatch" icon="shield">
+    Permission definition mismatch
+  </Card>
+</CardGroup>
+
+**Example:**
+```yaml
+# command_mismatch: Command configuration must be a mapping
+commands:
+  mycommand: "invalid string value"
+
+# permission_mismatch: Invalid default value
+permissions:
+  myplugin.admin:
+    default: invalid  # Must be: op, notop, true, or false
+```
+
+**Valid permission defaults:**
+- `op` - Only operators
+- `notop` - Everyone except operators
+- `true` - Everyone
+- `false` - No one (must be granted explicitly)
+
+## Filtering by category
+
+You can exclude specific categories from your analysis:
+
+```bash
+retina run --exclude-categories=unused_variable,unused_import
+```
+
+Or use category presets:
+
+```bash
+retina run --exclude-categories=unused,undefined
+```
+
+**Available presets:**
+- `unused` - All unused code issues
+- `undefined` - All undefined reference issues
+- `pocketmine` - All PocketMine-MP specific issues
+
+See [Filtering](/concepts/filtering) for complete details on filtering options.
+
+## Related resources
+
+- [Analyzers](/concepts/analyzers)
+- [Severity levels](/concepts/severity-levels)
+- [Filtering](/concepts/filtering)

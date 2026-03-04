@@ -1,0 +1,195 @@
+---
+title: Event handler analyzer
+description: Validates event handler methods to ensure they are properly configured and follow PocketMine-MP conventions
+---
+
+The event handler analyzer validates event handler methods in your plugin to ensure they follow PocketMine-MP's event system requirements and best practices.
+
+## What it checks
+
+This analyzer examines event handler methods and validates:
+
+- Method visibility (must be public)
+- Static modifier usage (should not be static)
+- Parameter count (must have exactly one parameter)
+- Event priority values
+- Cancelled event handling
+
+## Issues detected
+
+### Event handler not public
+
+Event handlers must be public to be registered by PocketMine's event system.
+
+<Warning>
+Private or protected event handlers will not be called when events are fired.
+</Warning>
+
+**Incorrect:**
+```php
+private function onPlayerJoin(PlayerJoinEvent $event): void {
+    // This will never be called
+}
+```
+
+**Correct:**
+```php
+public function onPlayerJoin(PlayerJoinEvent $event): void {
+    // This handler will work properly
+}
+```
+
+### Event handler is static
+
+Event handlers should not be static methods.
+
+**Incorrect:**
+```php
+public static function onBlockBreak(BlockBreakEvent $event): void {
+    // Static event handlers are not supported
+}
+```
+
+**Correct:**
+```php
+public function onBlockBreak(BlockBreakEvent $event): void {
+    // Non-static method works correctly
+}
+```
+
+### Invalid parameter count
+
+Event handlers must accept exactly one parameter: the event object.
+
+**Incorrect:**
+```php
+public function onPlayerChat(PlayerChatEvent $event, string $extra): void {
+    // Too many parameters
+}
+
+public function onPlayerMove(): void {
+    // Missing event parameter
+}
+```
+
+**Correct:**
+```php
+public function onPlayerChat(PlayerChatEvent $event): void {
+    // Exactly one parameter
+}
+```
+
+### Invalid event priority
+
+The analyzer validates `@priority` annotations in docblocks to ensure they use valid priority values.
+
+**Valid priorities:**
+- `LOWEST`
+- `LOW`
+- `NORMAL`
+- `HIGH`
+- `HIGHEST`
+- `MONITOR`
+
+**Incorrect:**
+```php
+/**
+ * @priority SUPER_HIGH
+ */
+public function onDamage(EntityDamageEvent $event): void {
+    // Invalid priority value
+}
+```
+
+**Correct:**
+```php
+/**
+ * @priority HIGH
+ */
+public function onDamage(EntityDamageEvent $event): void {
+    // Valid priority
+}
+```
+
+### Monitor priority warning
+
+When using `MONITOR` priority, you should only observe the event, not modify it.
+
+<Note>
+MONITOR priority is for observation only. Do not modify the event or call `setCancelled()` at this priority.
+</Note>
+
+```php
+/**
+ * @priority MONITOR
+ */
+public function onPlayerQuit(PlayerQuitEvent $event): void {
+    // Good: Just logging
+    $this->logger->info($event->getPlayer()->getName() . " left");
+    
+    // Bad: Don't modify the event
+    // $event->setQuitMessage("");
+}
+```
+
+### Handles cancelled events
+
+The analyzer flags when `@handleCancelled` is used to ensure it's intentional.
+
+```php
+/**
+ * @handleCancelled true
+ */
+public function onBlockPlace(BlockPlaceEvent $event): void {
+    // This will run even if the event is cancelled
+    // Make sure this is what you want
+}
+```
+
+<Accordion title="Common use cases for @handleCancelled">
+  - Logging all attempts (even cancelled ones)
+  - Cleaning up resources regardless of event outcome
+  - Monitoring plugin compatibility issues
+  
+  In most cases, you should NOT use `@handleCancelled`.
+</Accordion>
+
+## Best practices
+
+<Card title="Event handler checklist" icon="check">
+  - Use `public` visibility
+  - Avoid `static` methods
+  - Accept exactly one parameter (the event)
+  - Type-hint the event parameter
+  - Use appropriate priority levels
+  - Only use `MONITOR` for observation
+  - Avoid `@handleCancelled` unless necessary
+</Card>
+
+## Example: Properly structured event handler
+
+```php
+use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerJoinEvent;
+use pocketmine\event\block\BlockBreakEvent;
+
+class MyListener implements Listener {
+    
+    /**
+     * @priority NORMAL
+     */
+    public function onPlayerJoin(PlayerJoinEvent $event): void {
+        $player = $event->getPlayer();
+        $player->sendMessage("Welcome!");
+    }
+    
+    /**
+     * @priority HIGH
+     */
+    public function onBlockBreak(BlockBreakEvent $event): void {
+        if (!$event->getPlayer()->hasPermission("myplugin.break")) {
+            $event->cancel();
+        }
+    }
+}
+```

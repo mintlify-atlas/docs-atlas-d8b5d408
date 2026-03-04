@@ -1,0 +1,302 @@
+---
+title: Command analyzer
+description: Validates command implementations and ensures they match plugin.yml declarations
+---
+
+The command analyzer validates command classes and cross-checks them against command declarations in your `plugin.yml` file.
+
+## What it checks
+
+This analyzer examines command implementations and validates:
+
+- Command class structure (execute method, visibility)
+- Command declarations in `plugin.yml`
+- Permission references in commands
+- Command aliases validity
+- Constructor implementation
+
+## Issues detected
+
+### Missing execute method
+
+Command classes must implement the `execute()` method.
+
+<Warning>
+Commands without an `execute()` method will fail at runtime.
+</Warning>
+
+**Incorrect:**
+```php
+use pocketmine\command\Command;
+use pocketmine\command\CommandSender;
+
+class MyCommand extends Command {
+    // Missing execute method!
+}
+```
+
+**Correct:**
+```php
+class MyCommand extends Command {
+    public function execute(
+        CommandSender $sender,
+        string $commandLabel,
+        array $args
+    ): bool {
+        $sender->sendMessage("Command executed!");
+        return true;
+    }
+}
+```
+
+### Execute method signature
+
+The `execute()` method must have the correct signature.
+
+**Required parameters:**
+1. `CommandSender $sender` - Who executed the command
+2. `string $commandLabel` - The command alias used
+3. `array $args` - Command arguments
+
+**Return type:**
+- Should return `bool`
+- `true` = command succeeded
+- `false` = show usage message
+
+```php
+public function execute(
+    CommandSender $sender,
+    string $commandLabel,
+    array $args
+): bool {
+    if (count($args) < 1) {
+        return false; // Shows usage
+    }
+    
+    // Command logic here
+    return true;
+}
+```
+
+### Execute method visibility
+
+The `execute()` method must be `public`.
+
+**Incorrect:**
+```php
+protected function execute(
+    CommandSender $sender,
+    string $commandLabel,
+    array $args
+): bool {
+    // This won't work
+    return true;
+}
+```
+
+**Correct:**
+```php
+public function execute(
+    CommandSender $sender,
+    string $commandLabel,
+    array $args
+): bool {
+    return true;
+}
+```
+
+### Command references undefined permission
+
+Commands that reference permissions in `plugin.yml` must have those permissions declared.
+
+**plugin.yml with error:**
+```yaml
+commands:
+  mycommand:
+    description: "My command"
+    permission: myplugin.use  # This permission doesn't exist!
+
+permissions: {}
+```
+
+**Correct plugin.yml:**
+```yaml
+commands:
+  mycommand:
+    description: "My command"
+    permission: myplugin.use
+
+permissions:
+  myplugin.use:
+    description: "Allow using the command"
+    default: op
+```
+
+### Invalid command aliases
+
+Command aliases must be strings.
+
+**Incorrect:**
+```yaml
+commands:
+  mycommand:
+    aliases:
+      - mycmd     # Correct
+      - 123       # This will cause a warning
+```
+
+**Correct:**
+```yaml
+commands:
+  mycommand:
+    aliases:
+      - mycmd
+      - mc
+```
+
+### Missing parent constructor call
+
+Command constructors should call `parent::__construct()`.
+
+<Note>
+This is an informational warning. Ensure you're properly initializing the parent Command class.
+</Note>
+
+**Potentially incorrect:**
+```php
+class MyCommand extends Command {
+    public function __construct() {
+        // Missing parent::__construct() call
+    }
+}
+```
+
+**Correct:**
+```php
+class MyCommand extends Command {
+    public function __construct() {
+        parent::__construct(
+            "mycommand",
+            "Command description",
+            "/mycommand <args>"
+        );
+    }
+}
+```
+
+### Commands not declared in plugin.yml
+
+If you have command classes but no command declarations in `plugin.yml`, you'll get a warning.
+
+```yaml
+# plugin.yml
+name: MyPlugin
+version: 1.0.0
+main: MyPlugin\Main
+api: 5.0.0
+
+# Missing commands section!
+```
+
+Add command declarations:
+```yaml
+commands:
+  mycommand:
+    description: "My custom command"
+    usage: "/mycommand <arg>"
+    permission: myplugin.command
+```
+
+## Best practices
+
+<Card title="Command implementation checklist" icon="check">
+  - Implement `execute()` method with correct signature
+  - Use `public` visibility for execute method
+  - Return `bool` from execute method
+  - Call `parent::__construct()` with command details
+  - Declare commands in `plugin.yml`
+  - Define all referenced permissions
+  - Validate command arguments before use
+  - Check sender type when needed (Player vs Console)
+</Card>
+
+## Complete example
+
+**Command class:**
+```php
+use pocketmine\command\Command;
+use pocketmine\command\CommandSender;
+use pocketmine\player\Player;
+
+class TeleportCommand extends Command {
+    
+    private Main $plugin;
+    
+    public function __construct(Main $plugin) {
+        parent::__construct(
+            "teleport",
+            "Teleport to coordinates",
+            "/teleport <x> <y> <z>"
+        );
+        $this->plugin = $plugin;
+        $this->setPermission("myplugin.teleport");
+    }
+    
+    public function execute(
+        CommandSender $sender,
+        string $commandLabel,
+        array $args
+    ): bool {
+        if (!$sender instanceof Player) {
+            $sender->sendMessage("This command is only for players");
+            return true;
+        }
+        
+        if (count($args) !== 3) {
+            return false; // Show usage
+        }
+        
+        $x = (float) $args[0];
+        $y = (float) $args[1];
+        $z = (float) $args[2];
+        
+        $sender->teleport(new Vector3($x, $y, $z));
+        $sender->sendMessage("Teleported!");
+        
+        return true;
+    }
+}
+```
+
+**plugin.yml:**
+```yaml
+name: MyPlugin
+version: 1.0.0
+main: MyPlugin\Main
+api: 5.0.0
+
+commands:
+  teleport:
+    description: "Teleport to coordinates"
+    usage: "/teleport <x> <y> <z>"
+    permission: myplugin.teleport
+    aliases:
+      - tp
+
+permissions:
+  myplugin.teleport:
+    description: "Allow teleporting"
+    default: op
+```
+
+**Registration in Main class:**
+```php
+class Main extends PluginBase {
+    public function onEnable(): void {
+        $this->getServer()->getCommandMap()->register(
+            "myplugin",
+            new TeleportCommand($this)
+        );
+    }
+}
+```

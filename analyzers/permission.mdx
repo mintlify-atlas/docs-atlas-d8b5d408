@@ -1,0 +1,300 @@
+---
+title: Permission analyzer
+description: Validates permission definitions and checks for proper usage in code
+---
+
+The permission analyzer validates permission declarations in `plugin.yml` and cross-checks them against permission usage in your code.
+
+## What it checks
+
+This analyzer examines permissions and validates:
+
+- Permission naming conventions
+- Default value validity
+- Child permission references
+- Permission usage in code vs declarations
+- Unused permissions
+
+## Issues detected
+
+### Invalid permission naming
+
+Permission names should follow naming conventions: lowercase letters, numbers, dots, underscores, and hyphens only.
+
+<Warning>
+Permission names with uppercase letters or special characters may cause issues with some permission plugins.
+</Warning>
+
+**Incorrect:**
+```yaml
+permissions:
+  MyPlugin.Admin:           # Uppercase letters
+    description: "Admin permission"
+  my-plugin@special:        # Invalid character @
+    description: "Special permission"
+```
+
+**Correct:**
+```yaml
+permissions:
+  myplugin.admin:
+    description: "Admin permission"
+  my-plugin.special:
+    description: "Special permission"
+```
+
+### Invalid default value
+
+Permission `default` values must be one of: `op`, `notop`, `true`, or `false`.
+
+**Valid default values:**
+- `op` - Only server operators have this permission by default
+- `notop` - Everyone except operators has this permission
+- `true` - Everyone has this permission by default
+- `false` - Nobody has this permission by default
+
+**Incorrect:**
+```yaml
+permissions:
+  myplugin.use:
+    default: admin    # Invalid!
+```
+
+**Correct:**
+```yaml
+permissions:
+  myplugin.use:
+    default: op
+    
+  myplugin.basic:
+    default: true
+    
+  myplugin.vip:
+    default: false
+```
+
+### Undefined child permission
+
+If a permission references child permissions, those children must also be declared.
+
+**Incorrect:**
+```yaml
+permissions:
+  myplugin.admin:
+    description: "Admin access"
+    children:
+      myplugin.command:    # This permission doesn't exist!
+        true
+```
+
+**Correct:**
+```yaml
+permissions:
+  myplugin.admin:
+    description: "Admin access"
+    children:
+      myplugin.command:
+        true
+        
+  myplugin.command:
+    description: "Use commands"
+    default: false
+```
+
+### Undeclared permission usage
+
+Permissions used in code should be declared in `plugin.yml`.
+
+**Code using undeclared permission:**
+```php
+public function onCommand(CommandSender $sender, Command $cmd, string $label, array $args): bool {
+    if (!$sender->hasPermission("myplugin.admin")) {
+        // This permission isn't in plugin.yml!
+        return false;
+    }
+    return true;
+}
+```
+
+**Add to plugin.yml:**
+```yaml
+permissions:
+  myplugin.admin:
+    description: "Admin permission"
+    default: op
+```
+
+### Unused permission
+
+Permissions declared but never used in code might be unnecessary.
+
+<Note>
+This is an informational warning. The permission might be used in ways the analyzer can't detect, such as by external plugins.
+</Note>
+
+```yaml
+permissions:
+  myplugin.legacy:
+    description: "Old permission no longer used"
+    # Consider removing if truly unused
+```
+
+## How permissions are detected in code
+
+The analyzer finds permission usage by scanning for these method calls:
+
+- `hasPermission("permission.name")`
+- `addAttachment("permission.name")`
+
+**Example code that will be detected:**
+```php
+if ($player->hasPermission("myplugin.fly")) {
+    // Permission usage detected
+}
+
+$attachment = $player->addAttachment($this);
+$attachment->setPermission("myplugin.temp", true);
+```
+
+## Permission hierarchies
+
+Use child permissions to create permission hierarchies:
+
+```yaml
+permissions:
+  # Parent permission grants all children
+  myplugin.admin:
+    description: "Full admin access"
+    default: op
+    children:
+      myplugin.command.give:
+        true
+      myplugin.command.take:
+        true
+      myplugin.bypass:
+        true
+        
+  # Individual permissions
+  myplugin.command.give:
+    description: "Use /give command"
+    default: false
+    
+  myplugin.command.take:
+    description: "Use /take command"
+    default: false
+    
+  myplugin.bypass:
+    description: "Bypass restrictions"
+    default: false
+    
+  # Moderator gets some permissions
+  myplugin.moderator:
+    description: "Moderator permissions"
+    default: false
+    children:
+      myplugin.command.give:
+        true
+```
+
+## Best practices
+
+<Card title="Permission best practices" icon="shield">
+  - Use lowercase naming: `myplugin.feature.action`
+  - Be specific: `myplugin.command.fly` not just `fly`
+  - Set appropriate defaults
+  - Document each permission clearly
+  - Use hierarchies for grouped permissions
+  - Prefix with your plugin name
+  - Check permissions before sensitive operations
+</Card>
+
+## Complete example
+
+**plugin.yml:**
+```yaml
+name: MyPlugin
+version: 1.0.0
+main: MyPlugin\Main
+api: 5.0.0
+
+permissions:
+  # Admin - full access
+  myplugin.admin:
+    description: "Full admin access"
+    default: op
+    children:
+      myplugin.command.teleport:
+        true
+      myplugin.command.gamemode:
+        true
+      myplugin.bypass.cooldown:
+        true
+  
+  # Commands
+  myplugin.command.teleport:
+    description: "Use teleport command"
+    default: false
+    
+  myplugin.command.gamemode:
+    description: "Change gamemode"
+    default: false
+    
+  # Features
+  myplugin.bypass.cooldown:
+    description: "Bypass command cooldowns"
+    default: false
+    
+  myplugin.basic:
+    description: "Basic plugin features"
+    default: true
+```
+
+**Using permissions in code:**
+```php
+use pocketmine\player\Player;
+
+class Main extends PluginBase {
+    
+    public function teleportPlayer(Player $player, Vector3 $pos): bool {
+        if (!$player->hasPermission("myplugin.command.teleport")) {
+            $player->sendMessage("You don't have permission");
+            return false;
+        }
+        
+        $player->teleport($pos);
+        return true;
+    }
+    
+    public function changeGamemode(Player $player, int $mode): bool {
+        if (!$player->hasPermission("myplugin.command.gamemode")) {
+            $player->sendMessage("No permission");
+            return false;
+        }
+        
+        $player->setGamemode($mode);
+        return true;
+    }
+}
+```
+
+<Accordion title="When to use permission defaults">
+  **default: op**
+  - Admin commands
+  - Dangerous operations
+  - Server management features
+  
+  **default: true**
+  - Basic features everyone should have
+  - Cosmetic features
+  - Read-only commands
+  
+  **default: false**
+  - Premium features
+  - Moderator tools
+  - Anything requiring explicit grant
+  
+  **default: notop**
+  - Rarely used
+  - For "punishment" permissions
+  - Special restriction scenarios
+</Accordion>

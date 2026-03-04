@@ -1,0 +1,396 @@
+---
+title: Thread safety analyzer
+description: Detects thread safety violations in AsyncTask implementations and global state usage
+---
+
+The Thread Safety analyzer identifies code patterns that can cause crashes, data corruption, or undefined behavior when using PocketMine-MP's async task system.
+
+## What it detects
+
+This analyzer scans for two main categories of thread safety issues:
+
+### AsyncTask violations
+
+Inside `AsyncTask::onRun()` and `__construct()` methods, the analyzer detects:
+
+- **Superglobal access** - Using `$_SERVER`, `$_GET`, `$_POST`, `$_FILES`, `$_COOKIE`, `$_SESSION`, `$_REQUEST`, `$_ENV`, or `$GLOBALS`
+- **Static variable declarations** - Declaring static variables that are shared between threads
+- **Static property access** - Accessing static properties that may cause race conditions
+
+<Warning>
+All AsyncTask violations are reported as **errors** because they can cause crashes or data corruption.
+</Warning>
+
+### Global state usage
+
+Anywhere in your code:
+
+- **Global keyword usage** - Using the `global` keyword, which affects testability and thread safety
+
+<Note>
+Global keyword usage is reported as a **warning** since it doesn't always cause immediate issues but should be avoided.
+</Note>
+
+## Why thread safety matters
+
+PocketMine-MP runs async tasks in separate threads. These threads:
+
+- **Don't share memory** with the main server thread
+- **Can't access** server objects, worlds, players, or entities
+- **Must communicate** through serializable data passed to/from the task
+
+Violating these rules causes:
+
+- Segmentation faults (crashes)
+- Data corruption
+- Race conditions
+- Undefined behavior
+
+## Common violations
+
+### Superglobal access in async tasks
+
+Superglobals like `$_SERVER` may not exist or may have different values in worker threads.
+
+<CodeGroup>
+```php Incorrect
+class DatabaseTask extends AsyncTask {
+    public function onRun(): void {
+        // ERROR: Superglobal access in async context
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $query = $_POST['query'];
+    }
+}
+```
+
+```php Correct
+class DatabaseTask extends AsyncTask {
+    public function __construct(
+        private string $ip,
+        private string $query
+    ) {}
+    
+    public function onRun(): void {
+        // Pass data through constructor instead
+        $this->connect($this->ip);
+        $this->execute($this->query);
+    }
+}
+```
+</CodeGroup>
+
+### Static variables in async context
+
+Static variables are not shared between threads and can cause unexpected behavior.
+
+<CodeGroup>
+```php Incorrect
+class CacheTask extends AsyncTask {
+    public function onRun(): void {
+        // ERROR: Static variable in async context
+        static $cache = [];
+        
+        if (!isset($cache[$this->key])) {
+            $cache[$this->key] = $this->fetchData();
+        }
+    }
+}
+```
+
+```php Correct
+class CacheTask extends AsyncTask {
+    private static array $cache = [];
+    
+    public function onRun(): void {
+        // Use class-level static properties
+        if (!isset(self::$cache[$this->key])) {
+            self::$cache[$this->key] = $this->fetchData();
+        }
+    }
+}
+```
+</CodeGroup>
+
+<Note>
+While class-level static properties are allowed, be aware that each worker thread has its own copy. They are NOT shared between threads.
+</Note>
+
+### Static property access in async tasks
+
+Static properties may reference server objects that don't exist in worker threads.
+
+<CodeGroup>
+```php Incorrect
+class PlayerDataTask extends AsyncTask {
+    public function onRun(): void {
+        // ERROR: May access server objects
+        $plugin = MyPlugin::$instance;
+        $config = Settings::$config;
+    }
+}
+```
+
+```php Correct
+class PlayerDataTask extends AsyncTask {
+    public function __construct(
+        private array $configData
+    ) {}
+    
+    public function onRun(): void {
+        // Pass serialized data instead
+        $setting = $this->configData['key'];
+    }
+    
+    public function onCompletion(): void {
+        // Access plugin instance in main thread
+        $plugin = MyPlugin::getInstance();
+        $plugin->handleResult($this->getResult());
+    }
+}
+```
+</CodeGroup>
+
+### Using global keyword
+
+The `global` keyword creates hidden dependencies and makes code harder to test.
+
+<CodeGroup>
+```php Incorrect
+$databaseConnection = null;
+
+class MyPlugin extends PluginBase {
+    public function onEnable(): void {
+        global $databaseConnection;
+        $databaseConnection = new Database();
+    }
+}
+
+class UserManager {
+    public function getUser(string $name): ?User {
+        global $databaseConnection;
+        return $databaseConnection->fetchUser($name);
+    }
+}
+```
+
+```php Correct
+class MyPlugin extends PluginBase {
+    private Database $database;
+    
+    public function onEnable(): void {
+        $this->database = new Database();
+        $userManager = new UserManager($this->database);
+    }
+}
+
+class UserManager {
+    public function __construct(
+        private Database $database
+    ) {}
+    
+    public function getUser(string $name): ?User {
+        return $this->database->fetchUser($name);
+    }
+}
+```
+</CodeGroup>
+
+## Safe data passing patterns
+
+### Constructor parameters
+
+Pass simple, serializable data through the constructor:
+
+```php
+class WebRequestTask extends AsyncTask {
+    public function __construct(
+        private string $url,
+        private array $headers,
+        private int $timeout
+    ) {}
+    
+    public function onRun(): void {
+        $ch = curl_init($this->url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $this->headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        
+        $result = curl_exec($ch);
+        $this->setResult($result);
+    }
+    
+    public function onCompletion(): void {
+        $response = $this->getResult();
+        // Process response in main thread
+    }
+}
+```
+
+### Static class properties (PM5)
+
+Use static properties for thread-local storage:
+
+```php
+class DataProcessingTask extends AsyncTask {
+    private static array $cache = [];
+    
+    public function onRun(): void {
+        $key = $this->getCacheKey();
+        
+        if (!isset(self::$cache[$key])) {
+            self::$cache[$key] = $this->computeValue();
+        }
+        
+        $this->setResult(self::$cache[$key]);
+    }
+}
+```
+
+<Warning>
+Remember: Each worker thread has its own copy of static properties. They are NOT shared between the main thread and worker threads.
+</Warning>
+
+## What you CANNOT do in async tasks
+
+<Accordion title="Access server objects">
+```php
+// WRONG - Will crash
+public function onRun(): void {
+    $this->getOwner()->getServer(); // Plugin instance doesn't exist here
+    Server::getInstance(); // Server instance doesn't exist here
+}
+```
+
+Server objects only exist in the main thread. Worker threads run in isolation.
+</Accordion>
+
+<Accordion title="Access world or entity objects">
+```php
+// WRONG - Will crash
+public function onRun(): void {
+    $world = $this->plugin->getServer()->getWorldManager()->getDefaultWorld();
+    $player = $this->plugin->getServer()->getPlayerByPrefix($name);
+}
+```
+
+Worlds, players, entities, and all game objects only exist in the main thread.
+</Accordion>
+
+<Accordion title="Modify plugin state directly">
+```php
+// WRONG - Race condition
+public function onRun(): void {
+    MyPlugin::$instance->counter++; // Don't modify plugin state
+    MyPlugin::$instance->data[] = $value; // Don't modify plugin data
+}
+```
+
+Modify state in `onCompletion()` which runs in the main thread, not `onRun()`.
+</Accordion>
+
+<Accordion title="Call plugin methods">
+```php
+// WRONG - Plugin doesn't exist in worker thread
+public function onRun(): void {
+    $this->plugin->saveData($data);
+    $this->plugin->getConfig()->set("key", $value);
+}
+```
+
+Store results and process them in `onCompletion()` instead.
+</Accordion>
+
+## Correct AsyncTask pattern
+
+Here's the complete pattern for safe async task usage:
+
+```php
+class SafeAsyncTask extends AsyncTask {
+    // Pass only serializable data
+    public function __construct(
+        private string $input,
+        private array $options
+    ) {}
+    
+    // Runs in worker thread - isolated from server
+    public function onRun(): void {
+        // Only use data passed in constructor
+        $result = $this->processData($this->input, $this->options);
+        
+        // Store result for main thread
+        $this->setResult($result);
+    }
+    
+    // Runs in main thread - can access server objects
+    public function onCompletion(): void {
+        $result = $this->getResult();
+        
+        // Now you can safely access plugin, server, worlds, etc.
+        $plugin = MyPlugin::getInstance();
+        $plugin->handleResult($result);
+        
+        $player = $plugin->getServer()->getPlayerByPrefix($this->options['player']);
+        if ($player !== null) {
+            $player->sendMessage("Task completed!");
+        }
+    }
+}
+```
+
+## How it works
+
+The analyzer performs two passes:
+
+1. **AsyncTask analysis** - Identifies all classes extending `AsyncTask` and scans their `onRun()` and `__construct()` methods for:
+   - Superglobal variable access (`$_SERVER`, `$_GET`, etc.)
+   - Static variable declarations
+   - Static property access
+
+2. **Global usage analysis** - Scans all PHP files for `global` keyword usage
+
+<Note>
+The analyzer uses PHP-Parser to traverse the AST and only flags violations within async task methods, preventing false positives.
+</Note>
+
+## Example output
+
+```
+Access to superglobal $_SERVER in async context is thread-unsafe
+  File: src/tasks/DatabaseTask.php:23
+  Category: THREAD_SAFETY
+  Severity: ERROR
+  Code: superglobal_in_async
+  Fix: Avoid sharing mutable state between threads. Use storeLocal()/fetchLocal() for data passing.
+
+Use of global keyword detected. This can cause issues with thread safety and testability.
+  File: src/Utils.php:15
+  Category: THREAD_SAFETY  
+  Severity: WARNING
+  Code: global_keyword
+```
+
+## Configuration
+
+Disable this analyzer in `retina.yml`:
+
+```yaml
+excludeAnalyzers:
+  - ThreadSafety
+```
+
+Or exclude just thread safety warnings:
+
+```yaml
+excludeCategories:
+  - thread_safety
+```
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Deprecated API analyzer" href="/analyzers/deprecated-api" icon="triangle-exclamation">
+    Find deprecated PocketMine-MP API usage
+  </Card>
+  <Card title="PHPStan analyzer" href="/analyzers/phpstan" icon="code">
+    Advanced static analysis with PHPStan
+  </Card>
+</CardGroup>

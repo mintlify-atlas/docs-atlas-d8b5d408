@@ -1,0 +1,328 @@
+---
+title: Main class analyzer
+description: Validates that the main plugin class exists and is properly configured
+---
+
+The Main class analyzer ensures your plugin's main class file exists at the expected location and is correctly implemented to work with PocketMine-MP.
+
+## What it checks
+
+### File location validation
+
+The analyzer verifies the main class file exists at the expected path based on the namespace defined in `plugin.yml`:
+
+- Converts the fully-qualified class name to a file path
+- Expects files under the `src/` directory
+- Follows PSR-4 autoloading conventions
+
+**Example:**
+```yaml
+# plugin.yml
+main: MyPlugin\Main
+```
+
+Expected file location: `src/MyPlugin/Main.php`
+
+### Class definition validation
+
+Once the file is found, the analyzer parses and validates:
+
+- A class definition exists in the file
+- The fully-qualified class name (FQCN) matches the plugin.yml declaration
+- The class is not abstract
+- The class properly extends or implements PocketMine-MP plugin interfaces
+
+### Plugin interface validation
+
+Your main class must follow one of these patterns:
+
+<Card title="Extend PluginBase" icon="code">
+The recommended approach for most plugins.
+
+```php
+namespace MyPlugin;
+
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    // Your plugin code
+}
+```
+</Card>
+
+<Card title="Implement Plugin interface" icon="code">
+For advanced use cases requiring custom plugin base classes.
+
+```php
+namespace MyPlugin;
+
+use pocketmine\plugin\Plugin;
+
+class Main implements Plugin {
+    // Must implement all Plugin interface methods
+}
+```
+</Card>
+
+### Lifecycle method validation
+
+The analyzer checks that plugin lifecycle methods follow proper visibility rules:
+
+- `onLoad()` - Should be public or protected
+- `onEnable()` - Should be public or protected
+- `onDisable()` - Should be public or protected
+
+<Warning>
+Lifecycle methods with private visibility will generate warnings.
+</Warning>
+
+## Issues detected
+
+### Error severity issues
+
+<AccordionGroup>
+  <Accordion title="Main class file not found">
+    
+  The file at the expected path doesn't exist.
+  
+  ```
+  Error: Main class file not found at expected path: src/MyPlugin/Main.php
+  ```
+  
+  **Fix:** Create the main class file at the expected location or update the `main` field in plugin.yml.
+  
+  </Accordion>
+  
+  <Accordion title="Failed to parse main class">
+    
+  The PHP file contains syntax errors.
+  
+  ```
+  Error: Failed to parse main class file: Syntax error, unexpected token "}"
+  ```
+  
+  **Fix:** Correct the PHP syntax errors in your main class file.
+  
+  </Accordion>
+  
+  <Accordion title="No class definition found">
+    
+  The file doesn't contain a class definition.
+  
+  ```
+  Error: No class definition found in main class file
+  ```
+  
+  **Fix:** Ensure your main class file contains a class definition.
+  
+  </Accordion>
+  
+  <Accordion title="FQCN mismatch">
+    
+  The class name or namespace doesn't match plugin.yml.
+  
+  ```
+  Error: Main class FQCN mismatch. Expected: MyPlugin\Main, Found: MyPlugin\Core
+  ```
+  
+  **Fix:** Change the class name/namespace to match the `main` field in plugin.yml.
+  
+  </Accordion>
+  
+  <Accordion title="Abstract class">
+    
+  The main class is declared as abstract.
+  
+  ```
+  Error: Main class must not be abstract
+  ```
+  
+  **Fix:** Remove the `abstract` modifier from the main class.
+  
+  </Accordion>
+  
+  <Accordion title="Not a plugin">
+    
+  The class doesn't extend PluginBase or implement Plugin interface.
+  
+  ```
+  Error: Main class must implement pocketmine\plugin\Plugin interface or extend PluginBase
+  ```
+  
+  **Fix:** Extend `pocketmine\plugin\PluginBase` or implement `pocketmine\plugin\Plugin`.
+  
+  </Accordion>
+</AccordionGroup>
+
+### Warning severity issues
+
+- Lifecycle methods (`onLoad`, `onEnable`, `onDisable`) should be public or protected
+
+## Code examples
+
+### Correct implementation
+
+<CodeGroup>
+```php Basic plugin
+declare(strict_types=1);
+
+namespace MyPlugin;
+
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    
+    protected function onEnable(): void {
+        $this->getLogger()->info("Plugin enabled!");
+    }
+    
+    protected function onDisable(): void {
+        $this->getLogger()->info("Plugin disabled!");
+    }
+}
+```
+
+```php With lifecycle methods
+declare(strict_types=1);
+
+namespace MyPlugin;
+
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    
+    protected function onLoad(): void {
+        // Called when plugin is loaded
+        $this->getLogger()->debug("Plugin loaded");
+    }
+    
+    protected function onEnable(): void {
+        // Called when plugin is enabled
+        $this->getLogger()->info("Plugin enabled!");
+    }
+    
+    protected function onDisable(): void {
+        // Called when plugin is disabled
+        $this->getLogger()->info("Plugin disabled!");
+    }
+}
+```
+</CodeGroup>
+
+### Common issues
+
+<CodeGroup>
+```php Abstract class
+// Bad: Abstract class cannot be instantiated
+abstract class Main extends PluginBase {
+    // Error: Main class must not be abstract
+}
+
+// Good: Remove abstract modifier
+class Main extends PluginBase {
+    // Correct
+}
+```
+
+```php FQCN mismatch
+// plugin.yml declares: MyPlugin\Main
+
+// Bad: Wrong namespace
+namespace MyPlugin\Core;
+
+class Main extends PluginBase {
+    // Error: Expected MyPlugin\Main, Found MyPlugin\Core\Main
+}
+
+// Good: Matching namespace
+namespace MyPlugin;
+
+class Main extends PluginBase {
+    // Correct
+}
+```
+
+```php Not extending PluginBase
+// Bad: Regular class
+namespace MyPlugin;
+
+class Main {
+    // Error: Must extend PluginBase or implement Plugin
+}
+
+// Good: Extends PluginBase
+namespace MyPlugin;
+
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    // Correct
+}
+```
+
+```php Private lifecycle method
+// Warning: Private visibility
+class Main extends PluginBase {
+    
+    private function onEnable(): void {
+        // Warning: Lifecycle method should be public or protected
+    }
+}
+
+// Good: Protected visibility
+class Main extends PluginBase {
+    
+    protected function onEnable(): void {
+        // Correct
+    }
+}
+```
+</CodeGroup>
+
+## Path resolution
+
+The analyzer resolves the main class path using PSR-4 conventions:
+
+1. Takes the FQCN from plugin.yml (e.g., `MyPlugin\SubNamespace\Main`)
+2. Converts backslashes to forward slashes: `MyPlugin/SubNamespace/Main`
+3. Adds `.php` extension: `MyPlugin/SubNamespace/Main.php`
+4. Prepends `src/` directory: `src/MyPlugin/SubNamespace/Main.php`
+
+<Note>
+The analyzer expects your source files to be in the `src/` directory following PSR-4 autoloading standards.
+</Note>
+
+## Best practices
+
+<Card title="Use proper namespace structure" icon="folder-tree">
+Organize your code with meaningful namespaces that match your directory structure.
+
+```php
+// File: src/MyPlugin/Commands/MainCommand.php
+namespace MyPlugin\Commands;
+```
+</Card>
+
+<Card title="Keep lifecycle methods protected" icon="lock">
+Use protected visibility for `onLoad()`, `onEnable()`, and `onDisable()` methods.
+
+```php
+protected function onEnable(): void {
+    // Implementation
+}
+```
+</Card>
+
+<Card title="Always extend PluginBase" icon="shapes">
+Unless you have specific requirements, extend PluginBase instead of implementing Plugin interface directly.
+
+```php
+class Main extends PluginBase {
+    // Provides helpful methods out of the box
+}
+```
+</Card>
+
+<Note>
+The analyzer validates your main class at `src/Analyzer/MainClassAnalyzer.php:16-44`
+</Note>

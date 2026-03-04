@@ -1,0 +1,372 @@
+---
+title: PHP file analyzer
+description: Validates PHP file structure, syntax, and coding standards
+---
+
+The PHP file analyzer performs general PHP validation across all PHP files in your plugin. It checks for syntax errors, proper namespace declarations, type safety features, and identifies unused imports.
+
+## What it checks
+
+### Syntax validation
+
+The analyzer parses every PHP file in your plugin to detect syntax errors:
+
+- Uses PHP-Parser to build an abstract syntax tree (AST)
+- Reports parse errors with line numbers
+- Identifies malformed code that would cause runtime errors
+
+<Warning>
+PHP syntax errors will prevent your plugin from loading.
+</Warning>
+
+### Namespace declaration
+
+Validates that files containing classes, interfaces, traits, or enums have proper namespace declarations:
+
+- Files with class definitions should declare a namespace
+- Follows PSR-4 autoloading standards
+- Prevents naming conflicts
+
+**Checked structures:**
+- Classes
+- Interfaces
+- Traits
+- Enums
+
+### Strict types declaration
+
+Checks for the presence of `declare(strict_types=1)` at the top of PHP files:
+
+- Enforces strict type checking
+- Improves type safety
+- Catches type-related bugs early
+
+<Note>
+While not required, strict types are strongly recommended for better code quality.
+</Note>
+
+### Unused imports
+
+Identifies `use` statements that import classes/functions/constants but never use them:
+
+- Detects imported classes not referenced in code
+- Keeps code clean and maintainable
+- Helps identify dead code paths
+
+<Note>
+The unused import check may produce false positives for classes used only in PHPDoc comments.
+</Note>
+
+## Issues detected
+
+### Error severity
+
+<Accordion title="PHP syntax error">
+
+The file contains invalid PHP syntax that cannot be parsed.
+
+```
+Error: PHP syntax error: Syntax error, unexpected token "}", expecting ";" on line 42
+```
+
+**Common causes:**
+- Missing semicolons
+- Unmatched braces or parentheses
+- Invalid PHP keywords or constructs
+
+**Fix:** Correct the syntax error at the specified line.
+
+</Accordion>
+
+### Warning severity
+
+<Accordion title="Missing namespace declaration">
+
+A file contains a class, interface, trait, or enum without a namespace declaration.
+
+```
+Warning: File contains class/interface/trait without namespace declaration
+```
+
+**Impact:**
+- Classes exist in global namespace
+- Potential naming conflicts
+- Doesn't follow PSR-4 conventions
+
+**Fix:** Add a namespace declaration to follow PSR-4 autoloading.
+
+```php
+declare(strict_types=1);
+
+namespace MyPlugin\Utils;
+
+class Helper {
+    // Class implementation
+}
+```
+
+</Accordion>
+
+### Info severity
+
+<AccordionGroup>
+  <Accordion title="Missing strict types">
+    
+  The file doesn't include `declare(strict_types=1)` at the top.
+  
+  ```
+  Info: Missing declare(strict_types=1) at the top of the file
+  ```
+  
+  **Fix:** Add strict types declaration for better type safety.
+  
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  namespace MyPlugin;
+  // Rest of code
+  ```
+  
+  </Accordion>
+  
+  <Accordion title="Unused import">
+    
+  A `use` statement imports a class that is never used in the file.
+  
+  ```
+  Info: Unused import: pocketmine\event\player\PlayerJoinEvent
+  ```
+  
+  **Fix:** Remove the unused use statement or verify it is not used in PHPDoc comments.
+  
+  ```php
+  // Bad: Imported but never used
+  use pocketmine\event\player\PlayerJoinEvent;
+  use pocketmine\plugin\PluginBase;
+  
+  class Main extends PluginBase {
+      // PlayerJoinEvent is never used
+  }
+  
+  // Good: Remove unused import
+  use pocketmine\plugin\PluginBase;
+  
+  class Main extends PluginBase {
+      // Only import what you use
+  }
+  ```
+  
+  </Accordion>
+</AccordionGroup>
+
+## Code examples
+
+### Correct PHP file structure
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace MyPlugin\Commands;
+
+use pocketmine\command\Command;
+use pocketmine\command\CommandSender;
+use pocketmine\plugin\PluginOwned;
+use pocketmine\plugin\Plugin;
+
+class MyCommand extends Command implements PluginOwned {
+    
+    public function __construct(
+        private Plugin $plugin
+    ) {
+        parent::__construct(
+            "mycommand",
+            "My command description"
+        );
+    }
+    
+    public function execute(CommandSender $sender, string $label, array $args): bool {
+        // Command implementation
+        return true;
+    }
+    
+    public function getOwningPlugin(): Plugin {
+        return $this->plugin;
+    }
+}
+```
+
+### Common issues
+
+<CodeGroup>
+```php Syntax error
+// Bad: Missing semicolon
+class Main extends PluginBase {
+    
+    protected function onEnable(): void {
+        $this->getLogger()->info("Enabled")  // Missing semicolon
+    }
+}
+// Error: PHP syntax error: Syntax error, unexpected token "}"
+
+// Good: Proper syntax
+class Main extends PluginBase {
+    
+    protected function onEnable(): void {
+        $this->getLogger()->info("Enabled");
+    }
+}
+```
+
+```php Missing namespace
+// Bad: No namespace
+<?php
+
+declare(strict_types=1);
+
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    // Warning: File contains class without namespace declaration
+}
+
+// Good: With namespace
+<?php
+
+declare(strict_types=1);
+
+namespace MyPlugin;
+
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    // Correct
+}
+```
+
+```php Missing strict types
+// Bad: No strict_types declaration
+<?php
+
+namespace MyPlugin;
+// Info: Missing declare(strict_types=1)
+
+class Main extends PluginBase {
+    // Works but not recommended
+}
+
+// Good: With strict_types
+<?php
+
+declare(strict_types=1);
+
+namespace MyPlugin;
+
+class Main extends PluginBase {
+    // Better type safety
+}
+```
+
+```php Unused imports
+// Bad: Unused imports
+use pocketmine\plugin\PluginBase;
+use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerJoinEvent;
+use pocketmine\utils\TextFormat;
+
+class Main extends PluginBase {
+    // Info: Unused imports: Listener, PlayerJoinEvent, TextFormat
+}
+
+// Good: Only used imports
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    // Clean and minimal
+}
+```
+</CodeGroup>
+
+## File scanning
+
+The analyzer processes all PHP files in your plugin:
+
+1. Retrieves list of PHP files from the analysis context
+2. Reads each file's content
+3. Parses code into an abstract syntax tree
+4. Runs validation checks on the AST
+5. Reports all issues found
+
+<Note>
+The analyzer skips files that cannot be parsed and reports the syntax error instead.
+</Note>
+
+## Best practices
+
+<Card title="Always use strict types" icon="shield-check">
+Start every PHP file with strict type declaration for better type safety.
+
+```php
+<?php
+
+declare(strict_types=1);
+```
+</Card>
+
+<Card title="Use meaningful namespaces" icon="folder-tree">
+Organize code with namespaces that reflect your directory structure.
+
+```php
+namespace MyPlugin\Managers\Economy;
+```
+</Card>
+
+<Card title="Keep imports clean" icon="broom">
+Only import classes you actually use. Remove unused imports regularly.
+
+```php
+// Only import what's needed
+use pocketmine\plugin\PluginBase;
+use pocketmine\event\Listener;
+```
+</Card>
+
+<Card title="Follow PSR-4 standards" icon="book">
+Place classes in appropriate directories matching their namespace.
+
+```
+src/MyPlugin/Commands/MyCommand.php
+↓
+namespace MyPlugin\Commands;
+```
+</Card>
+
+## Limitations
+
+<Warning>
+The unused import detection may report false positives in these cases:
+</Warning>
+
+- Classes used only in PHPDoc comments (`@param`, `@return`, etc.)
+- Classes referenced in string literals or dynamic code
+- Classes used in reflection or dynamic class loading
+
+If you encounter false positives, verify the import is genuinely used before removing it.
+
+## Integration with other analyzers
+
+The PHP file analyzer works alongside other Retina analyzers:
+
+- **Plugin.yml analyzer** - Validates manifest file
+- **Main class analyzer** - Checks main class implementation
+- **Event handler analyzer** - Validates event listeners
+- **PHPStan analyzer** - Deep static analysis
+
+Together, these provide comprehensive validation of your plugin code.
+
+<Note>
+The analyzer scans PHP files at `src/Analyzer/PhpFileAnalyzer.php:14-40`
+</Note>

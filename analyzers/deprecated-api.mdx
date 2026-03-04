@@ -1,0 +1,305 @@
+---
+title: Deprecated API analyzer
+description: Detects usage of deprecated PocketMine-MP APIs and suggests modern replacements
+---
+
+The Deprecated API analyzer scans your plugin code for outdated PocketMine-MP API methods, classes, and constants that have been removed or replaced in newer API versions.
+
+## What it detects
+
+This analyzer identifies three types of deprecated API usage:
+
+- **Deprecated methods** - Method calls that have been replaced in PM4/PM5
+- **Deprecated classes** - Classes that have been moved or removed
+- **Deprecated constants** - Constants that no longer exist
+
+All detected issues are reported as **warnings** with the replacement API clearly specified.
+
+## Common deprecated APIs
+
+### Level to World migration (PM4)
+
+PocketMine-MP 4.0.0 renamed "Level" to "World" across the entire API.
+
+<CodeGroup>
+```php Incorrect
+$level = $player->getLevel();
+$player->setLevel($world);
+$spawn = $server->getLevelNonNull("world");
+```
+
+```php Correct
+$world = $player->getWorld();
+$player->setWorld($world);
+$spawn = $server->getWorld("world");
+```
+</CodeGroup>
+
+<Warning>
+The `pocketmine\level` namespace was completely removed in PM4. Update all imports to `pocketmine\world`.
+</Warning>
+
+### Player messaging methods (PM4-PM5)
+
+Several player messaging methods were renamed for consistency.
+
+<CodeGroup>
+```php Incorrect
+$player->addTitle("Title");
+$player->addSubTitle("Subtitle");
+$player->addActionBarMessage("Action");
+$player->sendPopup("Popup"); // PM5
+$player->sendTip("Tip"); // PM5
+```
+
+```php Correct
+$player->sendTitle("Title");
+$player->sendSubTitle("Subtitle");
+$player->sendActionBarMessage("Action");
+$player->sendToastNotification("Toast"); // PM5
+$player->sendToastNotification("Toast"); // PM5
+```
+</CodeGroup>
+
+### Metadata system (removed in PM4)
+
+The metadata system was completely removed in PocketMine-MP 4.0.0.
+
+<CodeGroup>
+```php Incorrect
+$entity->setMetadata("custom_key", new StringMetadataValue($plugin, "value"));
+$meta = $entity->getMetadata("custom_key");
+if ($entity->hasMetadata("custom_key")) {
+    $entity->removeMetadata("custom_key", $plugin);
+}
+```
+
+```php Correct
+use pocketmine\utils\ObjectSet;
+
+class CustomDataStorage {
+    private static ObjectSet $data;
+    
+    public static function init(): void {
+        self::$data = new ObjectSet();
+    }
+    
+    public static function set(Entity $entity, string $key, mixed $value): void {
+        self::$data[$entity->getId()][$key] = $value;
+    }
+    
+    public static function get(Entity $entity, string $key): mixed {
+        return self::$data[$entity->getId()][$key] ?? null;
+    }
+}
+```
+</CodeGroup>
+
+### AsyncTask local storage (PM5)
+
+Thread-local storage methods were deprecated in favor of static class properties.
+
+<CodeGroup>
+```php Incorrect
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        $this->storeLocal("key", $value);
+        $data = $this->fetchLocal("key");
+    }
+}
+```
+
+```php Correct
+class MyTask extends AsyncTask {
+    private static array $storage = [];
+    
+    public function onRun(): void {
+        self::$storage["key"] = $value;
+        $data = self::$storage["key"] ?? null;
+    }
+}
+```
+</CodeGroup>
+
+### Entity visibility methods (PM5)
+
+<CodeGroup>
+```php Incorrect
+$player->hidePlayer($otherPlayer);
+$player->showPlayer($otherPlayer);
+if ($player->canSee($otherPlayer)) {
+    // ...
+}
+```
+
+```php Correct
+// Use despawnFrom/spawnTo directly
+$otherPlayer->despawnFrom($player);
+$otherPlayer->spawnTo($player);
+
+// Implement custom visibility tracking
+class VisibilityManager {
+    private static array $hidden = [];
+    
+    public static function canSee(Player $viewer, Player $target): bool {
+        return !isset(self::$hidden[$viewer->getId()][$target->getId()]);
+    }
+}
+```
+</CodeGroup>
+
+### Resource methods (PM5)
+
+<CodeGroup>
+```php Incorrect
+class MyPlugin extends PluginBase {
+    public function onEnable(): void {
+        $this->saveResource("config.yml");
+        $resource = $this->getResource("data.json");
+    }
+}
+```
+
+```php Correct
+use pocketmine\utils\Filesystem;
+
+class MyPlugin extends PluginBase {
+    public function onEnable(): void {
+        $resourcePath = $this->getResourcePath("config.yml");
+        $dataFolder = $this->getDataFolder();
+        $targetPath = $dataFolder . "config.yml";
+        
+        if (!file_exists($targetPath)) {
+            Filesystem::recursiveCopy($resourcePath, $targetPath);
+        }
+        
+        $content = file_get_contents($this->getResourcePath("data.json"));
+    }
+}
+```
+</CodeGroup>
+
+## Item and enchantment changes (PM5)
+
+### Item equality methods
+
+<CodeGroup>
+```php Incorrect
+if ($item1->equals($item2)) {
+    // Items are equal
+}
+```
+
+```php Correct
+if ($item1->equalsExact($item2)) {
+    // Items are exactly equal (including count)
+}
+
+if ($item1->canStackWith($item2)) {
+    // Items can be stacked together
+}
+```
+</CodeGroup>
+
+### Enchantment compatibility
+
+<CodeGroup>
+```php Incorrect
+$flags = $enchantment->getPrimaryItemFlags();
+$flags = $enchantment->getSecondaryItemFlags();
+$enchantment->hasPrimaryItemType($item->getTypeId());
+```
+
+```php Correct
+use pocketmine\item\enchantment\ItemEnchantmentTags;
+
+if ($item->hasEnchantmentTag(ItemEnchantmentTags::SWORD())) {
+    // Item is a sword
+}
+```
+</CodeGroup>
+
+## Full list of detected deprecations
+
+The analyzer detects **74 deprecated methods**, **8 deprecated classes**, and **1 deprecated constant**:
+
+<Accordion title="View all deprecated methods">
+- `getLevel`, `setLevel`, `getLevelNonNull` → Use World methods
+- `teleportImmediate` → `teleport`
+- `addTitle`, `addSubTitle`, `addActionBarMessage` → `send*` equivalents
+- `sendPopup`, `sendTip` → `sendToastNotification`
+- `getMetadata`, `setMetadata`, `hasMetadata`, `removeMetadata` → Custom storage
+- `getPlayerExact` → `getPlayerByPrefix` or custom lookup
+- `hidePlayer`, `showPlayer`, `canSee` → Entity spawn/despawn methods
+- `getResource`, `saveResource` → PHP file functions with `getResourcePath()`
+- AsyncTask local storage methods → Static properties
+- `canTick` → `getApplyInterval()`
+- `getCollisionCubes` → `getBlockCollisionBoxes`
+- `getFullBlock` → `getBlock()->getStateId()`
+- `equals` → `equalsExact` or `canStackWith`
+- Enchantment flag methods → `ItemEnchantmentTags`
+- `toHTML` → Custom implementation
+- `getMemoryUsage` → `Process::getAdvancedMemoryUsage()`
+</Accordion>
+
+<Accordion title="View all deprecated classes">
+- `pocketmine\level\Level` → `pocketmine\world\World`
+- `pocketmine\level\Position` → `pocketmine\world\Position`
+- `pocketmine\level\Location` → `pocketmine\world\Location`
+- `pocketmine\level\ChunkManager` → `pocketmine\world\ChunkManager`
+- `pocketmine\level\format\Chunk` → `pocketmine\world\format\Chunk`
+- `pocketmine\tile\Tile` → `pocketmine\block\tile\Tile`
+- `pocketmine\metadata\Metadatable` → Custom data storage
+- `pocketmine\plugin\PluginLogger` → PSR-3 Logger
+</Accordion>
+
+## How it works
+
+The analyzer uses PHP-Parser to traverse the abstract syntax tree (AST) of your code and:
+
+1. **Scans method calls** - Checks both `$obj->method()` and `Class::method()` calls
+2. **Scans use statements** - Detects deprecated class imports
+3. **Scans fully qualified names** - Catches inline `\pocketmine\level\Level` usage
+4. **Scans constants** - Identifies deprecated constant references
+
+<Note>
+Each detected issue includes the line number, deprecated API name, replacement suggestion, and the API version when it was deprecated.
+</Note>
+
+## Example output
+
+When the analyzer finds deprecated API usage, it reports:
+
+```
+Method 'getLevel' is deprecated since API 4.0.0. Use getWorld instead.
+  File: src/Main.php:45
+  Severity: WARNING
+  Fix: Replace with getWorld
+```
+
+## Configuration
+
+Disable this analyzer in `retina.yml`:
+
+```yaml
+excludeAnalyzers:
+  - DeprecatedApi
+```
+
+Or exclude just deprecated API warnings:
+
+```yaml
+excludeCategories:
+  - deprecated_api
+```
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="PHPStan analyzer" href="/analyzers/phpstan" icon="code">
+    Advanced static analysis with PHPStan integration
+  </Card>
+  <Card title="Thread safety analyzer" href="/analyzers/thread-safety" icon="shield">
+    Detect thread safety violations in async tasks
+  </Card>
+</CardGroup>

@@ -1,0 +1,393 @@
+---
+title: Resource analyzer
+description: Validates resource file access and ensures referenced files exist
+---
+
+The resource analyzer validates that resource files referenced in your code actually exist in the `resources/` directory.
+
+## What it checks
+
+This analyzer examines resource file usage and validates:
+
+- Existence of `resources/` directory
+- Presence of `config.yml` when config methods are used
+- Resource file references match actual files
+- Resource method usage patterns
+
+## Issues detected
+
+### Missing resources directory
+
+Plugins typically need a `resources/` directory for configuration and asset files.
+
+<Note>
+This is an informational warning. Some plugins may not need resources.
+</Note>
+
+```
+MyPlugin/
+├── src/
+├── plugin.yml
+└── resources/  ← Create this directory
+    └── config.yml
+```
+
+### Missing config.yml
+
+If your code uses `getConfig()` but no `config.yml` exists in `resources/`, you'll get a warning.
+
+**Code using config:**
+```php
+class Main extends PluginBase {
+    public function onEnable(): void {
+        $this->saveDefaultConfig();
+        $value = $this->getConfig()->get("setting");
+        // But resources/config.yml doesn't exist!
+    }
+}
+```
+
+**Solution:**
+Create `resources/config.yml`:
+```yaml
+# Default configuration
+setting: default-value
+enabled: true
+```
+
+### Referenced resource not found
+
+When you reference a resource file in code, it must exist in the `resources/` directory.
+
+<Warning>
+Missing resource files will cause runtime errors.
+</Warning>
+
+**Code with missing resource:**
+```php
+public function onEnable(): void {
+    // References resources/messages.yml
+    $this->saveResource("messages.yml");
+    // But the file doesn't exist!
+}
+```
+
+**Solution:**
+Create `resources/messages.yml`:
+```yaml
+welcome: "Welcome to the server!"
+goodbye: "Thanks for playing!"
+```
+
+## Resource methods detected
+
+The analyzer tracks these resource-related method calls:
+
+### getResource()
+
+Gets a resource as a stream.
+
+```php
+$stream = $this->getResource("data.json");
+if ($stream !== null) {
+    $content = stream_get_contents($stream);
+    fclose($stream);
+}
+```
+
+### saveResource()
+
+Saves a resource from the plugin JAR to the data folder.
+
+```php
+// Save if it doesn't exist
+$this->saveResource("config.yml");
+
+// Force overwrite existing file
+$this->saveResource("messages.yml", true);
+```
+
+### getResourcePath()
+
+Gets the path to a resource file.
+
+```php
+$path = $this->getResourcePath("database.db");
+```
+
+### getResourceFolder()
+
+Gets the path to the resources folder.
+
+```php
+$folder = $this->getResourceFolder();
+```
+
+## Common resource patterns
+
+### Configuration files
+
+```php
+class Main extends PluginBase {
+    public function onEnable(): void {
+        // Save default config
+        $this->saveDefaultConfig();
+        
+        // Save additional configs
+        $this->saveResource("messages.yml");
+        $this->saveResource("ranks.yml");
+    }
+}
+```
+
+Directory structure:
+```
+resources/
+├── config.yml
+├── messages.yml
+└── ranks.yml
+```
+
+### Language files
+
+```php
+public function loadLanguage(string $lang): void {
+    $file = "lang/$lang.yml";
+    
+    // Check if resource exists
+    if ($this->getResource($file) === null) {
+        $this->getLogger()->warning("Language file not found: $file");
+        $file = "lang/en.yml"; // Fallback
+    }
+    
+    $this->saveResource($file);
+}
+```
+
+Directory structure:
+```
+resources/
+└── lang/
+    ├── en.yml
+    ├── es.yml
+    └── fr.yml
+```
+
+### Data files
+
+```php
+public function loadData(): array {
+    $this->saveResource("data.json");
+    
+    $path = $this->getDataFolder() . "data.json";
+    $content = file_get_contents($path);
+    
+    return json_decode($content, true);
+}
+```
+
+### Database schemas
+
+```php
+public function setupDatabase(): void {
+    $stream = $this->getResource("schema.sql");
+    
+    if ($stream === null) {
+        throw new \RuntimeException("Database schema not found");
+    }
+    
+    $schema = stream_get_contents($stream);
+    fclose($stream);
+    
+    // Execute SQL schema
+    $this->database->exec($schema);
+}
+```
+
+## Resource file examples
+
+### config.yml
+
+```yaml
+# Main configuration
+settings:
+  enabled: true
+  debug: false
+  
+features:
+  economy: true
+  chat: true
+```
+
+### messages.yml
+
+```yaml
+# Player messages
+welcome: "&aWelcome {player}!"
+goodbye: "&7{player} left the server"
+no-permission: "&cYou don't have permission!"
+
+errors:
+  invalid-args: "&cInvalid arguments!"
+  player-not-found: "&cPlayer not found!"
+```
+
+### data.json
+
+```json
+{
+  "version": 1,
+  "defaults": {
+    "health": 20,
+    "hunger": 20
+  },
+  "items": [
+    {"id": 1, "name": "Sword"},
+    {"id": 2, "name": "Pickaxe"}
+  ]
+}
+```
+
+## Best practices
+
+<Card title="Resource file checklist" icon="folder">
+  - Create `resources/` directory in your plugin
+  - Include default `config.yml`
+  - Use `saveDefaultConfig()` in `onEnable()`
+  - Check if resource exists before using
+  - Organize resources in subdirectories
+  - Document resource file formats
+  - Include all referenced resources
+  - Use descriptive file names
+</Card>
+
+## Complete example
+
+**Directory structure:**
+```
+MyPlugin/
+├── src/
+│   └── Main.php
+├── resources/
+│   ├── config.yml
+│   ├── messages.yml
+│   └── data/
+│       ├── items.json
+│       └── achievements.yml
+└── plugin.yml
+```
+
+**Main class:**
+```php
+use pocketmine\plugin\PluginBase;
+use pocketmine\utils\Config;
+
+class Main extends PluginBase {
+    
+    private Config $messages;
+    private array $items;
+    
+    public function onEnable(): void {
+        // Save all default resources
+        $this->saveDefaultConfig();
+        $this->saveResource("messages.yml");
+        $this->saveResource("data/items.json");
+        $this->saveResource("data/achievements.yml");
+        
+        // Load messages config
+        $this->messages = new Config(
+            $this->getDataFolder() . "messages.yml",
+            Config::YAML
+        );
+        
+        // Load items data
+        $this->loadItems();
+    }
+    
+    private function loadItems(): void {
+        $path = $this->getDataFolder() . "data/items.json";
+        $content = file_get_contents($path);
+        $this->items = json_decode($content, true) ?? [];
+    }
+    
+    public function getMessage(string $key): string {
+        return $this->messages->getNested($key, "Message not found");
+    }
+    
+    public function getItems(): array {
+        return $this->items;
+    }
+}
+```
+
+<Accordion title="Resource file organization tips">
+  **Flat structure** (small plugins):
+  ```
+  resources/
+  ├── config.yml
+  ├── messages.yml
+  └── data.json
+  ```
+  
+  **Organized structure** (larger plugins):
+  ```
+  resources/
+  ├── config.yml
+  ├── lang/
+  │   ├── en.yml
+  │   └── es.yml
+  ├── data/
+  │   ├── items.json
+  │   └── recipes.json
+  └── sql/
+      ├── schema.sql
+      └── migrations/
+  ```
+  
+  **Feature-based structure:**
+  ```
+  resources/
+  ├── config.yml
+  ├── economy/
+  │   ├── config.yml
+  │   └── items.yml
+  └── minigames/
+      ├── config.yml
+      └── maps.yml
+  ```
+</Accordion>
+
+## Handling missing resources
+
+```php
+class Main extends PluginBase {
+    
+    public function loadResourceSafely(string $name): ?string {
+        $stream = $this->getResource($name);
+        
+        if ($stream === null) {
+            $this->getLogger()->warning(
+                "Resource not found: $name"
+            );
+            return null;
+        }
+        
+        $content = stream_get_contents($stream);
+        fclose($stream);
+        
+        return $content;
+    }
+    
+    public function saveResourceSafely(string $name): bool {
+        try {
+            $this->saveResource($name);
+            return true;
+        } catch (\Exception $e) {
+            $this->getLogger()->error(
+                "Failed to save resource $name: " . $e->getMessage()
+            );
+            return false;
+        }
+    }
+}
+```

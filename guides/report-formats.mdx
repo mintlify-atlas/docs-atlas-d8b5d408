@@ -1,0 +1,424 @@
+---
+title: Report formats
+description: Choose from multiple report formats to suit your workflow
+---
+
+Retina supports multiple output formats to fit different use cases, from human-readable reports to machine-parseable formats for CI/CD integration.
+
+## Available formats
+
+Retina provides four main report formats:
+
+<Tabs>
+  <Tab title="Markdown">
+    Human-readable format with rich formatting, code snippets, and suggestions. Best for manual review and documentation.
+
+    **Extension:** `.md`
+
+    **Use when:**
+    - Reviewing issues manually
+    - Sharing reports in documentation
+    - Creating GitHub issues or pull request comments
+  </Tab>
+
+  <Tab title="JSON">
+    Machine-readable structured format. Perfect for CI/CD integration and programmatic analysis.
+
+    **Extension:** `.json`
+
+    **Use when:**
+    - Integrating with CI/CD pipelines
+    - Processing results programmatically
+    - Feeding data to other tools
+  </Tab>
+
+  <Tab title="Text">
+    Plain text format for console output and simple file logging.
+
+    **Extension:** `.txt`
+
+    **Use when:**
+    - Logging to files
+    - Viewing in basic text editors
+    - Console-only environments
+  </Tab>
+
+  <Tab title="HTML">
+    Interactive web-based report with dark theme, filtering, and visual statistics.
+
+    **Extension:** `.html`
+
+    **Use when:**
+    - Creating shareable web reports
+    - Presenting results to teams
+    - Archive analysis results
+  </Tab>
+</Tabs>
+
+## Using report formats
+
+### Command line
+
+Specify the format using the `-f` or `--format` option:
+
+<CodeGroup>
+```bash Markdown (default)
+retina run -f md
+```
+
+```bash JSON
+retina run -f json
+```
+
+```bash Text
+retina run -f txt
+```
+
+```bash HTML
+retina run -f html
+```
+</CodeGroup>
+
+### Configuration file
+
+Set the default format in `retina.yml`:
+
+```yaml
+reportFormat: md  # Options: md, json, txt, html
+```
+
+<Note>
+Command line options always override the configuration file setting.
+</Note>
+
+## Format details
+
+### Markdown format
+
+The Markdown format provides a comprehensive, human-readable report:
+
+<Steps>
+  <Step title="Plugin information">
+    Displays plugin name, version, scan path, date, and duration.
+  </Step>
+
+  <Step title="Summary statistics">
+    Shows files scanned, files with issues, and total issue count with category breakdown.
+  </Step>
+
+  <Step title="Detailed issues">
+    Lists all issues grouped by file with:
+    - Severity icon and level
+    - Category and line number
+    - Descriptive message
+    - Code snippets (if available)
+    - Suggestions for fixes
+  </Step>
+</Steps>
+
+**Example output:**
+
+```markdown
+# Retina Scan Report
+
+## Plugin Information
+
+| Property | Value |
+|----------|-------|
+| **Name** | MyPlugin |
+| **Version** | 1.0.0 |
+| **Path** | `/path/to/plugin` |
+
+## Summary
+
+- **Files Scanned:** 15
+- **Files with Issues:** 3
+- **Total Issues:** 7
+
+### Issues by Category
+
+| Category | Count |
+|----------|-------|
+| undefined_variable | 3 |
+| deprecated_api | 2 |
+| thread_safety | 2 |
+
+## Issues by File
+
+### `src/Main.php`
+
+- ⚠️ **Deprecated API** (Line 45): Using deprecated method Server::getOnlinePlayers()
+  - 💡 *Suggestion:* Use Server::getOnlinePlayersArray() instead
+  ```php
+  $players = $this->getServer()->getOnlinePlayers();
+  ```
+```
+
+### JSON format
+
+The JSON format provides structured data ideal for automation:
+
+**Structure:**
+
+```json
+{
+  "pluginInfo": {
+    "name": "MyPlugin",
+    "version": "1.0.0",
+    "path": "/path/to/plugin"
+  },
+  "scanInfo": {
+    "date": "2026-03-04 10:30:45",
+    "duration": 2.34,
+    "filesScanned": 15,
+    "filesWithIssues": 3
+  },
+  "summary": {
+    "totalIssues": 7,
+    "byCategory": {
+      "undefined_variable": 3,
+      "deprecated_api": 2,
+      "thread_safety": 2
+    },
+    "bySeverity": {
+      "error": 3,
+      "warning": 4
+    }
+  },
+  "issues": [
+    {
+      "file": "src/Main.php",
+      "line": 45,
+      "category": "deprecated_api",
+      "severity": "warning",
+      "message": "Using deprecated method Server::getOnlinePlayers()",
+      "suggestion": "Use Server::getOnlinePlayersArray() instead",
+      "snippet": "$players = $this->getServer()->getOnlinePlayers();"
+    }
+  ]
+}
+```
+
+<Note>
+JSON reports use pretty printing by default. The output is formatted with indentation for readability.
+</Note>
+
+### Text format
+
+The text format provides plain, console-friendly output:
+
+**Example output:**
+
+```
+======================================================================
+                     RETINA SCAN REPORT
+======================================================================
+
+PLUGIN INFORMATION
+----------------------------------------------------------------------
+  Name:          MyPlugin
+  Version:       1.0.0
+  Path:          /path/to/plugin
+  Scan Date:     2026-03-04 10:30:45
+  Scan Duration: 2.34 seconds
+
+SUMMARY
+----------------------------------------------------------------------
+  Files Scanned:     15
+  Files with Issues: 3
+  Total Issues:      7
+
+ISSUES BY CATEGORY
+----------------------------------------------------------------------
+  undefined_variable:                 3
+  deprecated_api:                     2
+  thread_safety:                      2
+
+DETAILED ISSUES
+======================================================================
+
+FILE: src/Main.php
+----------------------------------------------------------------------
+  [1] WARNING - Deprecated API
+      Line 45: Using deprecated method Server::getOnlinePlayers()
+      Suggestion: Use Server::getOnlinePlayersArray() instead
+      Code:
+        $players = $this->getServer()->getOnlinePlayers();
+```
+
+### HTML format
+
+The HTML format creates an interactive, self-contained web page:
+
+**Features:**
+
+- Dark theme optimized for readability
+- Statistics cards with visual hierarchy
+- Category badges with issue counts
+- Color-coded severity levels
+- Syntax-highlighted code snippets
+- Collapsible issue groups
+- Responsive design
+
+**Visual elements:**
+
+- **Error** - Red highlighting
+- **Warning** - Yellow highlighting
+- **Info** - Blue highlighting
+- **Hint** - Purple highlighting
+
+<Note>
+HTML reports are completely self-contained with embedded CSS. No external dependencies required.
+</Note>
+
+## Simple reports
+
+All formats support a simplified mode that shows only essential information:
+
+<Steps>
+  <Step title="Enable simple mode">
+    Use the `-s` or `--simple` flag:
+
+    ```bash
+    retina run -f json -s
+    ```
+
+    Or configure in `retina.yml`:
+
+    ```yaml
+    simpleReport: true
+    ```
+  </Step>
+
+  <Step title="What's excluded">
+    Simple reports omit:
+    - Code snippets
+    - Fix suggestions
+    - Detailed formatting
+    - Extended metadata
+  </Step>
+
+  <Step title="What's included">
+    Simple reports show:
+    - File path
+    - Line number
+    - Category
+    - Severity
+    - Message
+  </Step>
+</Steps>
+
+**Simple Markdown example:**
+
+```markdown
+# Retina Scan Report (Simple)
+
+## Summary
+
+- **Files Scanned:** 15
+- **Total Issues:** 7
+
+### Issues by Category
+
+- **undefined_variable:** 3
+- **deprecated_api:** 2
+
+## Issues
+
+### src/Main.php (2)
+
+- [WARNING] Deprecated API (Line 45): Using deprecated method
+- [ERROR] Undefined Variable (Line 67): Variable $data is undefined
+```
+
+<Warning>
+Simple reports are ideal for CI/CD environments where performance and file size matter, but they provide less context for debugging issues.
+</Warning>
+
+## Output options
+
+### Custom output path
+
+Specify where to save the report:
+
+```bash
+retina run -f html -o reports/analysis.html
+```
+
+**Default paths:**
+- Markdown: `retina-report.md`
+- JSON: `retina-report.json`
+- Text: `retina-report.txt`
+- HTML: `retina-report.html`
+
+### Console-only output
+
+Print results to console without creating a file:
+
+```bash
+retina run -c
+```
+
+This is useful for quick checks or when you want to pipe output to other tools:
+
+```bash
+retina run -f txt -c | grep "ERROR"
+```
+
+## Format selection guide
+
+<Tabs>
+  <Tab title="Development">
+    **Recommended:** Markdown or HTML
+
+    During active development, use formats that provide rich context:
+
+    ```bash
+    retina run -f md
+    ```
+
+    The code snippets and suggestions help you quickly understand and fix issues.
+  </Tab>
+
+  <Tab title="CI/CD">
+    **Recommended:** JSON (simple mode)
+
+    For automated pipelines, use machine-readable formats:
+
+    ```bash
+    retina run -f json -s -o results.json
+    ```
+
+    Parse the JSON to extract metrics, fail builds, or post comments.
+  </Tab>
+
+  <Tab title="Documentation">
+    **Recommended:** HTML or Markdown
+
+    For sharing with teams or archiving:
+
+    ```bash
+    retina run -f html -o reports/$(date +%Y%m%d)-analysis.html
+    ```
+
+    HTML reports can be hosted on internal servers or shared directly.
+  </Tab>
+
+  <Tab title="Quick checks">
+    **Recommended:** Text (console-only)
+
+    For rapid feedback during development:
+
+    ```bash
+    retina run -f txt -c
+    ```
+
+    Fast, lightweight, and doesn't clutter your workspace with files.
+  </Tab>
+</Tabs>
+
+## See also
+
+- [Configuration](/guides/configuration) - Set default report format
+- [CI integration](/guides/ci-integration) - Use JSON reports in pipelines
+- [Troubleshooting](/guides/troubleshooting) - Common report generation issues

@@ -1,0 +1,304 @@
+---
+title: Severity levels
+description: Understanding issue severity levels in Retina - from critical errors to minor hints
+---
+
+Retina assigns a severity level to every issue it detects. These levels help you prioritize which issues to fix first and understand the potential impact on your plugin.
+
+## Severity levels overview
+
+There are four severity levels, ranked from most to least critical:
+
+<CardGroup cols={2}>
+  <Card title="Error" icon="circle-xmark" color="#dc2626">
+    Critical issues that will cause crashes
+  </Card>
+  <Card title="Warning" icon="triangle-exclamation" color="#eab308">
+    Problems that should be fixed
+  </Card>
+  <Card title="Info" icon="circle-info" color="#3b82f6">
+    Suggestions for improvement
+  </Card>
+  <Card title="Hint" icon="lightbulb" color="#6b7280">
+    Minor style or optimization suggestions
+  </Card>
+</CardGroup>
+
+## Error severity
+
+**Priority: 4 (Highest)**
+
+Errors represent critical issues that will cause your plugin to crash, fail to load, or behave incorrectly at runtime. These must be fixed before deploying your plugin.
+
+### Common error issues
+
+- Missing required fields in plugin.yml
+- Main class not found or doesn't extend PluginBase
+- PHP syntax errors
+- Type mismatches in strict-typed code
+- Thread-unsafe calls in AsyncTask::onRun()
+- Invalid event handler signatures
+- Missing interface implementations
+- Invalid API version format
+
+### Examples
+
+```php
+// Error: Main class must extend PluginBase
+class Main {
+    // ERROR: Does not extend PluginBase
+}
+```
+
+```php
+// Error: Thread-unsafe call in async context
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        $server = $this->getServer(); // ERROR: Will crash
+    }
+}
+```
+
+```yaml
+# Error: Missing required field
+name: MyPlugin
+version: 1.0.0
+# ERROR: 'main' field is required
+```
+
+<Warning>
+Plugins with error-level issues may fail to load or crash during runtime. Always fix all errors before testing.
+</Warning>
+
+## Warning severity
+
+**Priority: 3**
+
+Warnings indicate problems that should be fixed but may not immediately crash your plugin. These issues can lead to bugs, unexpected behavior, or maintenance problems.
+
+### Common warning issues
+
+- Deprecated API usage
+- Event handlers with incorrect parameter counts
+- Plugin name contains spaces
+- Outdated API versions
+- Unused variables and parameters
+- Missing return statements
+- Visibility violations in lifecycle methods
+- Unfetched data in AsyncTask
+
+### Examples
+
+```php
+// Warning: Deprecated API usage
+$level = $server->getLevel($name);
+// WARNING: getLevel() deprecated since API 4.0.0
+// Use: getWorld() instead
+```
+
+```php
+// Warning: Event handler parameter count
+class MyListener implements Listener {
+    public function onJoin(PlayerJoinEvent $event, bool $extra) {
+        // WARNING: Event handler should have exactly one parameter
+    }
+}
+```
+
+```php
+// Warning: AsyncTask unfetched data
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        $this->storeLocal("key", "value");
+        // WARNING: storeLocal() called but fetchLocal() never used
+    }
+}
+```
+
+<Note>
+While warnings won't crash your plugin immediately, they often indicate code that will break in future PocketMine-MP versions or cause subtle bugs.
+</Note>
+
+## Info severity
+
+**Priority: 2**
+
+Info-level issues are suggestions for improving code quality, maintainability, or following best practices. They're not critical but can make your code better.
+
+### Common info issues
+
+- Non-semantic versioning in plugin.yml
+- Plugin name with spaces (discouraged)
+- MONITOR priority event handler usage
+- Handling cancelled events (may be intentional)
+- Suggestions for code improvements
+
+### Examples
+
+```yaml
+# Info: Non-semantic versioning
+name: MyPlugin
+version: 1.0  # INFO: Consider using semantic versioning (1.0.0)
+```
+
+```yaml
+# Info: Plugin name with spaces
+name: My Cool Plugin  # INFO: Consider using hyphens or underscores
+```
+
+```php
+// Info: MONITOR priority warning
+/**
+ * @priority MONITOR
+ */
+public function onDamage(EntityDamageEvent $event) {
+    // INFO: MONITOR priority is for observation only
+    // Do not modify event state at this priority
+}
+```
+
+```php
+// Info: Handling cancelled events
+/**
+ * @handleCancelled
+ */
+public function onChat(PlayerChatEvent $event) {
+    // INFO: Handler processes cancelled events
+    // Ensure this is intentional
+}
+```
+
+## Hint severity
+
+**Priority: 1 (Lowest)**
+
+Hints are minor suggestions for style improvements, optimizations, or coding conventions. These are the lowest priority and often subjective.
+
+### Common hint issues
+
+- Code style suggestions
+- Minor optimizations
+- Alternative approaches
+- Documentation suggestions
+
+### Examples
+
+```php
+// Hint: Could use null coalescing operator
+$value = isset($array['key']) ? $array['key'] : 'default';
+// HINT: Consider using: $value = $array['key'] ?? 'default';
+```
+
+<Note>
+Hint-level issues are often safe to ignore if they don't align with your coding style or project requirements.
+</Note>
+
+## Severity in reports
+
+Severity levels are displayed differently in each report format:
+
+### Markdown reports
+
+```markdown
+❌ **Error**: Thread-unsafe call to getServer() in AsyncTask::onRun()
+⚠️ **Warning**: Method 'getLevel' is deprecated since API 4.0.0
+ℹ️ **Info**: Plugin version does not follow semantic versioning
+💡 **Hint**: Consider using null coalescing operator
+```
+
+### JSON reports
+
+```json
+{
+  "severity": "error",
+  "severityLabel": "Error",
+  "message": "Thread-unsafe call to getServer()"
+}
+```
+
+### HTML reports
+
+HTML reports use color coding:
+- Red for errors
+- Yellow for warnings
+- Blue for info
+- Gray for hints
+
+## Filtering by severity
+
+You can exclude specific severity levels from your analysis:
+
+```bash
+retina run --exclude-severities=info,hint
+```
+
+```yaml retina.yml
+excludeSeverities:
+  - info
+  - hint
+```
+
+This is useful for:
+- Focusing on critical issues first
+- Reducing noise in CI/CD pipelines
+- Different strictness levels for different environments
+
+### Example: Production vs development
+
+```bash
+# Production: Only show errors and warnings
+retina run --exclude-severities=info,hint
+
+# Development: Show everything
+retina run
+
+# CI/CD: Fail only on errors
+retina run --exclude-severities=warning,info,hint
+```
+
+<Warning>
+You cannot exclude all severity levels. At least one severity must be shown for the analysis to be meaningful.
+</Warning>
+
+## Severity assignment
+
+Retina assigns severity levels based on the issue category and context:
+
+| Category | Typical Severity | Reasoning |
+|----------|-----------------|------------|
+| syntax_error | Error | Prevents code execution |
+| thread_safety | Error | Causes crashes |
+| invalid_event_handler | Error | Handler won't be called |
+| deprecated_api | Warning | Works now, will break later |
+| unused_variable | Warning | Indicates dead code |
+| invalid_event_priority | Error | Invalid configuration |
+| cancelled_event_access | Info | May be intentional |
+| Plugin name with spaces | Info | Discouraged but functional |
+
+**Source reference:**
+- Severity enum: src/Issue/IssueSeverity.php:8
+- Priority values used for sorting: Error=4, Warning=3, Info=2, Hint=1
+
+## Recommended workflow
+
+1. **Fix all errors first** - These will cause immediate problems
+2. **Address warnings** - These prevent future issues
+3. **Review info suggestions** - Improve code quality
+4. **Consider hints** - Optional improvements
+
+```bash
+# Step 1: Fix errors only
+retina run --exclude-severities=warning,info,hint
+
+# Step 2: Fix warnings
+retina run --exclude-severities=info,hint
+
+# Step 3: Review everything
+retina run
+```
+
+## Related resources
+
+- [Analyzers](/concepts/analyzers)
+- [Issue categories](/concepts/issue-categories)
+- [Filtering](/concepts/filtering)

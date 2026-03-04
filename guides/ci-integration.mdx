@@ -1,0 +1,599 @@
+---
+title: CI integration
+description: Integrate Retina into your continuous integration pipelines
+---
+
+Retina is designed to work seamlessly in CI/CD environments, allowing you to catch issues before they reach production. This guide shows how to integrate Retina into popular CI platforms.
+
+## Exit codes
+
+Retina uses standard exit codes to indicate scan results:
+
+- **0** - No issues found (success)
+- **1** - Issues detected or scan failed (failure)
+
+<Note>
+The exit code is based on whether any issues were found, regardless of their severity level. Use filtering options to control which issues cause failures.
+</Note>
+
+## GitHub Actions
+
+### Basic workflow
+
+Create `.github/workflows/retina.yml`:
+
+```yaml
+name: Retina Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer
+      
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+      
+      - name: Install Retina
+        run: |
+          curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+          echo "$HOME/.retina/bin" >> $GITHUB_PATH
+      
+      - name: Run Retina analysis
+        run: retina run -f json -s -o retina-report.json
+      
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retina-report
+          path: retina-report.json
+```
+
+### Advanced workflow with PR comments
+
+```yaml
+name: Retina Analysis with PR Comments
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer
+      
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+      
+      - name: Install Retina
+        run: |
+          curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+          echo "$HOME/.retina/bin" >> $GITHUB_PATH
+      
+      - name: Run Retina analysis
+        id: retina
+        continue-on-error: true
+        run: |
+          retina run -f json -s -o retina-report.json
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+      
+      - name: Parse results
+        if: always()
+        id: parse
+        run: |
+          ISSUE_COUNT=$(jq '.summary.totalIssues' retina-report.json)
+          echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+      
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueCount = ${{ steps.parse.outputs.issue_count }};
+            const exitCode = ${{ steps.retina.outputs.exit_code }};
+            
+            let body;
+            if (issueCount === 0) {
+              body = '✅ **Retina Analysis:** No issues found!';
+            } else {
+              body = `⚠️ **Retina Analysis:** Found ${issueCount} issue(s).\n\nPlease review the uploaded artifact for details.`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+      
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retina-report
+          path: retina-report.json
+      
+      - name: Fail if issues found
+        if: steps.retina.outputs.exit_code != '0'
+        run: exit 1
+```
+
+### Workflow with HTML report
+
+```yaml
+name: Retina HTML Report
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+      
+      - name: Install Retina
+        run: |
+          curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+          echo "$HOME/.retina/bin" >> $GITHUB_PATH
+      
+      - name: Run analysis
+        continue-on-error: true
+        run: retina run -f html -o report.html
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          destination_dir: reports
+          keep_files: true
+```
+
+## GitLab CI
+
+### Basic pipeline
+
+Create `.gitlab-ci.yml`:
+
+```yaml
+stages:
+  - analyze
+
+retina:analysis:
+  stage: analyze
+  image: php:8.1-cli
+  
+  before_script:
+    - apt-get update && apt-get install -y git curl
+    - curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+    - export PATH="$HOME/.retina/bin:$PATH"
+  
+  script:
+    - retina run -f json -s -o retina-report.json
+  
+  artifacts:
+    when: always
+    reports:
+      codequality: retina-report.json
+    paths:
+      - retina-report.json
+    expire_in: 30 days
+  
+  only:
+    - merge_requests
+    - main
+```
+
+### Pipeline with custom rules
+
+```yaml
+stages:
+  - analyze
+
+variables:
+  RETINA_LEVEL: "6"
+  RETINA_FORMAT: "json"
+
+retina:strict:
+  stage: analyze
+  image: php:8.1-cli
+  
+  before_script:
+    - apt-get update && apt-get install -y git curl
+    - curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+    - export PATH="$HOME/.retina/bin:$PATH"
+  
+  script:
+    - retina run -l ${RETINA_LEVEL} -f ${RETINA_FORMAT} -s -o retina-report.json
+  
+  artifacts:
+    when: always
+    paths:
+      - retina-report.json
+    expire_in: 30 days
+  
+  only:
+    - main
+
+retina:lenient:
+  stage: analyze
+  image: php:8.1-cli
+  
+  before_script:
+    - apt-get update && apt-get install -y git curl
+    - curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+    - export PATH="$HOME/.retina/bin:$PATH"
+  
+  script:
+    - retina run -l 4 --exclude-severities=hint,info -f json -s -o retina-report.json
+  
+  allow_failure: true
+  
+  artifacts:
+    when: always
+    paths:
+      - retina-report.json
+  
+  only:
+    - merge_requests
+```
+
+## Jenkins
+
+### Declarative pipeline
+
+Create `Jenkinsfile`:
+
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('Setup') {
+            steps {
+                sh '''
+                    curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+                    export PATH="$HOME/.retina/bin:$PATH"
+                '''
+            }
+        }
+        
+        stage('Analyze') {
+            steps {
+                sh '''
+                    export PATH="$HOME/.retina/bin:$PATH"
+                    retina run -f json -s -o retina-report.json || true
+                '''
+            }
+        }
+        
+        stage('Process Results') {
+            steps {
+                script {
+                    def report = readJSON file: 'retina-report.json'
+                    def issueCount = report.summary.totalIssues
+                    
+                    if (issueCount > 0) {
+                        echo "⚠️ Found ${issueCount} issues"
+                        currentBuild.result = 'UNSTABLE'
+                    } else {
+                        echo "✅ No issues found"
+                    }
+                }
+                
+                archiveArtifacts artifacts: 'retina-report.json', allowEmptyArchive: true
+            }
+        }
+    }
+    
+    post {
+        always {
+            publishHTML([
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: '.',
+                reportFiles: 'retina-report.json',
+                reportName: 'Retina Report'
+            ])
+        }
+    }
+}
+```
+
+## CircleCI
+
+Create `.circleci/config.yml`:
+
+```yaml
+version: 2.1
+
+jobs:
+  analyze:
+    docker:
+      - image: php:8.1-cli
+    
+    steps:
+      - checkout
+      
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get update && apt-get install -y git curl
+      
+      - run:
+          name: Install Retina
+          command: |
+            curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+            echo 'export PATH="$HOME/.retina/bin:$PATH"' >> $BASH_ENV
+      
+      - run:
+          name: Run analysis
+          command: |
+            retina run -f json -s -o retina-report.json
+      
+      - store_artifacts:
+          path: retina-report.json
+          destination: retina-report
+      
+      - store_test_results:
+          path: retina-report.json
+
+workflows:
+  version: 2
+  analyze:
+    jobs:
+      - analyze
+```
+
+## Bitbucket Pipelines
+
+Create `bitbucket-pipelines.yml`:
+
+```yaml
+image: php:8.1-cli
+
+pipelines:
+  default:
+    - step:
+        name: Retina Analysis
+        script:
+          - apt-get update && apt-get install -y git curl
+          - curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+          - export PATH="$HOME/.retina/bin:$PATH"
+          - retina run -f json -s -o retina-report.json
+        artifacts:
+          - retina-report.json
+  
+  pull-requests:
+    '**':
+      - step:
+          name: Retina Analysis (Lenient)
+          script:
+            - apt-get update && apt-get install -y git curl
+            - curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+            - export PATH="$HOME/.retina/bin:$PATH"
+            - retina run -l 4 --exclude-severities=hint -f json -s -o retina-report.json || true
+          artifacts:
+            - retina-report.json
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Use simple JSON format">
+    For CI environments, always use JSON format with simple mode:
+
+    ```bash
+    retina run -f json -s -o results.json
+    ```
+
+    This provides machine-readable output with minimal file size.
+  </Step>
+
+  <Step title="Configure via retina.yml">
+    Store your CI configuration in `retina.yml` and commit it to version control:
+
+    ```yaml
+    level: 7
+    reportFormat: json
+    simpleReport: true
+    excludeSeverities:
+      - hint
+    ```
+
+    This ensures consistent analysis across different environments.
+  </Step>
+
+  <Step title="Cache Retina installation">
+    Cache the Retina binary to speed up builds:
+
+    **GitHub Actions:**
+    ```yaml
+    - name: Cache Retina
+      uses: actions/cache@v3
+      with:
+        path: ~/.retina
+        key: retina-${{ runner.os }}
+    ```
+  </Step>
+
+  <Step title="Adjust strictness by branch">
+    Use different strictness levels for different branches:
+
+    - **Feature branches:** Level 4-6 (lenient, allow development)
+    - **Main/Production:** Level 7-9 (strict, catch all issues)
+  </Step>
+
+  <Step title="Archive reports">
+    Always archive reports as artifacts, even on success:
+
+    ```yaml
+    artifacts:
+      when: always
+      paths:
+        - retina-report.json
+    ```
+
+    This helps track code quality over time.
+  </Step>
+</Steps>
+
+## Handling failures
+
+### Soft failures (warnings)
+
+Allow the pipeline to continue but mark it as unstable:
+
+<CodeGroup>
+```yaml GitHub Actions
+- name: Run Retina
+  continue-on-error: true
+  run: retina run
+```
+
+```yaml GitLab CI
+retina:analysis:
+  script:
+    - retina run
+  allow_failure: true
+```
+
+```groovy Jenkins
+sh 'retina run || true'
+```
+</CodeGroup>
+
+### Hard failures (block merges)
+
+Fail the pipeline if issues are found:
+
+```yaml
+- name: Run Retina
+  run: retina run
+  # Pipeline fails with exit code 1 if issues found
+```
+
+### Conditional failures
+
+Fail only on critical issues:
+
+```bash
+# Exclude info and hint severity
+retina run --exclude-severities=info,hint
+
+# Exclude specific categories
+retina run --exclude-categories=unused
+
+# Lower strictness level
+retina run -l 4
+```
+
+## Performance optimization
+
+<Tabs>
+  <Tab title="Disable progress output">
+    ```bash
+    retina run --no-progress -f json -s
+    ```
+
+    Progress bars add overhead in CI environments.
+  </Tab>
+
+  <Tab title="Limit scan paths">
+    ```yaml
+    paths:
+      - src  # Only scan source code
+    
+    excludePaths:
+      - vendor
+      - tests
+      - build
+    ```
+
+    Avoid scanning unnecessary directories.
+  </Tab>
+
+  <Tab title="Disable heavy analyzers">
+    ```yaml
+    excludeAnalyzers:
+      - PHPStan  # Disable if you run PHPStan separately
+    ```
+  </Tab>
+</Tabs>
+
+## Monitoring and metrics
+
+### Extract metrics from JSON
+
+```bash
+# Total issues
+jq '.summary.totalIssues' retina-report.json
+
+# Issues by severity
+jq '.summary.bySeverity' retina-report.json
+
+# Issues by category
+jq '.summary.byCategory' retina-report.json
+
+# Files with most issues
+jq '[.issues | group_by(.file) | .[] | {file: .[0].file, count: length}] | sort_by(.count) | reverse' retina-report.json
+```
+
+### Trend tracking
+
+Store historical reports to track code quality trends:
+
+```yaml
+- name: Archive report with date
+  run: |
+    DATE=$(date +%Y%m%d-%H%M%S)
+    cp retina-report.json "reports/retina-$DATE.json"
+```
+
+<Warning>
+Retina's exit code indicates whether ANY issues were found. Use filtering options to control which issues should fail your build.
+</Warning>
+
+## See also
+
+- [Configuration](/guides/configuration) - Configure Retina for CI environments
+- [Report formats](/guides/report-formats) - Learn about JSON output structure
+- [Troubleshooting](/guides/troubleshooting) - Common CI integration issues

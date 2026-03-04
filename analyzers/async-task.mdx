@@ -1,0 +1,297 @@
+---
+title: Async task analyzer
+description: Detects AsyncTask misuse and thread safety violations
+---
+
+The async task analyzer detects common mistakes when using AsyncTask, particularly thread safety violations that can cause crashes or data corruption.
+
+## What it checks
+
+This analyzer examines AsyncTask classes and validates:
+
+- Required method implementation (`onRun`)
+- Method visibility
+- Thread-unsafe calls in `onRun()`
+- Data storage patterns (`storeLocal`/`fetchLocal`)
+- Completion handler implementation
+
+## Issues detected
+
+### Missing onRun method
+
+AsyncTask classes must implement the `onRun()` method.
+
+<Warning>
+The `onRun()` method contains the code that runs on a separate thread.
+</Warning>
+
+**Incorrect:**
+```php
+use pocketmine\scheduler\AsyncTask;
+
+class MyTask extends AsyncTask {
+    // Missing onRun() method!
+}
+```
+
+**Correct:**
+```php
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        // Background work here
+    }
+}
+```
+
+### Thread-unsafe calls in onRun
+
+This is the most critical issue. Accessing server, plugin, world, or player objects from `onRun()` will cause crashes.
+
+<Warning>
+**NEVER** access these in `onRun()`:
+- `getServer()`
+- `getPlugin()`
+- `getOwningPlugin()`
+- `getPlayer()`
+- `getWorld()`
+- `getLevel()`
+</Warning>
+
+**Dangerous code that will crash:**
+```php
+class BadTask extends AsyncTask {
+    private Server $server;
+    
+    public function onRun(): void {
+        // CRASH! Cannot access server from another thread
+        $this->server->broadcastMessage("Hello");
+        
+        // CRASH! Cannot access plugin
+        $this->getPlugin()->getLogger()->info("Working");
+        
+        // CRASH! Cannot get players
+        $player = $this->getPlayer();
+    }
+}
+```
+
+**Safe approach:**
+```php
+class SafeTask extends AsyncTask {
+    private string $playerName;
+    
+    public function __construct(string $playerName) {
+        // Store data needed for processing
+        $this->playerName = $playerName;
+    }
+    
+    public function onRun(): void {
+        // Safe: Only using primitive data
+        $result = $this->performHeavyCalculation($this->playerName);
+        $this->storeLocal("result", $result);
+    }
+    
+    public function onCompletion(): void {
+        // Now it's safe to access server objects
+        $result = $this->fetchLocal("result");
+        Server::getInstance()->broadcastMessage("Task complete: " . $result);
+    }
+    
+    private function performHeavyCalculation(string $name): string {
+        // Heavy processing here
+        return strtoupper($name);
+    }
+}
+```
+
+### What you CAN do in onRun
+
+<Card title="Safe operations in onRun" icon="check">
+  - File I/O operations
+  - Database queries
+  - Network requests
+  - Complex calculations
+  - Data processing
+  - JSON encoding/decoding
+  - String manipulation
+</Card>
+
+### Unfetched stored data
+
+If you use `storeLocal()` but never call `fetchLocal()`, the data is wasted.
+
+**Incorrect:**
+```php
+class WastedDataTask extends AsyncTask {
+    public function onRun(): void {
+        $data = ["result" => 123];
+        $this->storeLocal("data", $data);
+    }
+    
+    public function onCompletion(): void {
+        // Never using the stored data!
+    }
+}
+```
+
+**Correct:**
+```php
+class ProperDataTask extends AsyncTask {
+    public function onRun(): void {
+        $data = ["result" => 123];
+        $this->storeLocal("data", $data);
+    }
+    
+    public function onCompletion(): void {
+        $data = $this->fetchLocal("data");
+        // Use the data
+        Server::getInstance()->getLogger()->info("Result: " . $data["result"]);
+    }
+}
+```
+
+## Data flow pattern
+
+The correct pattern for passing data between threads:
+
+```php
+use pocketmine\scheduler\AsyncTask;
+use pocketmine\Server;
+
+class DatabaseQueryTask extends AsyncTask {
+    
+    private string $query;
+    private array $params;
+    
+    public function __construct(string $query, array $params) {
+        // 1. Pass data through constructor
+        $this->query = $query;
+        $this->params = $params;
+    }
+    
+    public function onRun(): void {
+        // 2. Use the data in background thread
+        $db = new \SQLite3("path/to/database.db");
+        $stmt = $db->prepare($this->query);
+        
+        foreach ($this->params as $i => $param) {
+            $stmt->bindValue($i + 1, $param);
+        }
+        
+        $result = $stmt->execute();
+        $rows = [];
+        
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $rows[] = $row;
+        }
+        
+        // 3. Store results
+        $this->storeLocal("rows", $rows);
+    }
+    
+    public function onCompletion(): void {
+        // 4. Fetch and use results on main thread
+        $rows = $this->fetchLocal("rows");
+        
+        // Now safe to interact with server
+        Server::getInstance()->getLogger()->info(
+            "Query returned " . count($rows) . " rows"
+        );
+        
+        // Safe to access players, worlds, etc.
+        foreach ($rows as $row) {
+            // Process results
+        }
+    }
+}
+```
+
+## Common use cases
+
+<Accordion title="Database queries">
+```php
+class DatabaseTask extends AsyncTask {
+    private string $dbPath;
+    private string $query;
+    
+    public function onRun(): void {
+        $db = new \SQLite3($this->dbPath);
+        $result = $db->query($this->query);
+        $this->storeLocal("result", $result->fetchArray());
+    }
+    
+    public function onCompletion(): void {
+        $data = $this->fetchLocal("result");
+        // Use data safely
+    }
+}
+```
+</Accordion>
+
+<Accordion title="File operations">
+```php
+class FileProcessTask extends AsyncTask {
+    private string $filePath;
+    
+    public function onRun(): void {
+        $content = file_get_contents($this->filePath);
+        $processed = $this->processLargeFile($content);
+        $this->storeLocal("processed", $processed);
+    }
+    
+    public function onCompletion(): void {
+        $result = $this->fetchLocal("processed");
+        // Update game state with result
+    }
+}
+```
+</Accordion>
+
+<Accordion title="Web API requests">
+```php
+class ApiRequestTask extends AsyncTask {
+    private string $url;
+    
+    public function onRun(): void {
+        $response = file_get_contents($this->url);
+        $data = json_decode($response, true);
+        $this->storeLocal("data", $data);
+    }
+    
+    public function onCompletion(): void {
+        $data = $this->fetchLocal("data");
+        // Update players with API data
+    }
+}
+```
+</Accordion>
+
+## Best practices
+
+<Card title="AsyncTask checklist" icon="check">
+  - Only use for I/O-bound or CPU-intensive tasks
+  - Never access server/world/player objects in `onRun()`
+  - Pass data via constructor or `storeLocal()`
+  - Use `onCompletion()` to update game state
+  - Handle errors gracefully
+  - Keep tasks focused and simple
+  - Consider task cancellation
+</Card>
+
+## Task submission
+
+```php
+class Main extends PluginBase {
+    
+    public function performDatabaseQuery(string $query): void {
+        $task = new DatabaseQueryTask($query);
+        
+        // Submit to async pool
+        Server::getInstance()->getAsyncPool()->submitTask($task);
+    }
+}
+```
+
+<Note>
+AsyncTasks run on separate threads. Understanding thread safety is crucial for stable plugins.
+</Note>

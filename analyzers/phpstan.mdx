@@ -1,0 +1,329 @@
+---
+title: PHPStan analyzer
+description: Integrates PHPStan for advanced static analysis with PocketMine-MP type stubs
+---
+
+The PHPStan analyzer integrates [PHPStan](https://phpstan.org/) - a powerful static analysis tool - into Retina's analysis pipeline, providing deep type checking and error detection.
+
+## What it does
+
+This analyzer:
+
+- **Runs PHPStan** on your plugin's `src/` directory
+- **Loads PocketMine-MP stubs** for accurate type information
+- **Categorizes errors** into specific issue types
+- **Determines severity** based on error characteristics
+- **Reports results** alongside other Retina analyzers
+
+<Note>
+PHPStan is optional. If PHPStan is not installed, Retina will show an informational message and continue with other analyzers.
+</Note>
+
+## Installation
+
+Install PHPStan in your plugin as a dev dependency:
+
+```bash
+composer require --dev phpstan/phpstan
+```
+
+Retina will automatically detect and use it.
+
+## How it works
+
+### 1. PHPStan detection
+
+Retina searches for the PHPStan binary in:
+
+- `{plugin}/vendor/bin/phpstan` (plugin's local installation)
+- `{retina}/vendor/bin/phpstan` (Retina's installation)
+- `/usr/local/bin/phpstan` (global installation)
+- `/usr/bin/phpstan` (system installation)
+- System PATH via `which phpstan`
+
+### 2. Configuration generation
+
+Retina automatically creates a temporary PHPStan configuration with:
+
+```yaml
+parameters:
+    level: 6  # Configurable via --level flag
+    paths:
+        - /path/to/plugin/src
+    scanDirectories:
+        - /path/to/retina/stubs  # PocketMine-MP type stubs
+    stubFiles:
+        - /path/to/retina/stubs/**/*.php
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
+```
+
+### 3. Analysis execution
+
+Retina runs:
+
+```bash
+phpstan analyse --error-format=json --no-progress -c {config} -l {level} src/
+```
+
+With a 300-second timeout to handle large projects.
+
+### 4. Result parsing
+
+PHPStan's JSON output is parsed and categorized into Retina issue types:
+
+- Undefined variables, methods, classes, functions, properties
+- Type mismatches and violations
+- Return type errors
+- Unused code
+- Dead code
+- Interface and inheritance violations
+- Null safety issues
+- And more...
+
+## Error categorization
+
+The analyzer maps PHPStan errors to specific categories:
+
+<Accordion title="Undefined references">
+- `Undefined variable: $var` → `UNDEFINED_VARIABLE`
+- `Call to undefined method` → `UNDEFINED_METHOD`
+- `Class X not found` → `UNDEFINED_CLASS`
+- `Access to undefined constant` → `UNDEFINED_CONSTANT`
+- `Function X not found` → `UNDEFINED_FUNCTION`
+- `Access to an undefined property` → `UNDEFINED_PROPERTY`
+</Accordion>
+
+<Accordion title="Type errors">
+- `expects X, Y given` → `TYPE_MISMATCH`
+- `Parameter #1 expects X, Y given` → `PARAMETER_TYPE`
+- `should return X but returns Y` → `RETURN_TYPE`
+- `return statement is missing` → `MISSING_RETURN`
+</Accordion>
+
+<Accordion title="Code quality">
+- `Unused variable` → `UNUSED_VARIABLE`
+- `is never used` → `UNUSED_VARIABLE`
+- `Dead code` → `DEAD_CODE`
+- `Unreachable statement` → `DEAD_CODE`
+</Accordion>
+
+<Accordion title="Object-oriented errors">
+- `does not implement interface` → `INTERFACE_VIOLATION`
+- `cannot extend final class` → `INVALID_INHERITANCE`
+- `abstract class contains abstract method` → `ABSTRACT_VIOLATION`
+- `Cannot instantiate abstract class` → `INSTANTIATION_ERROR`
+</Accordion>
+
+<Accordion title="Visibility and access">
+- `Access to private property` → `VISIBILITY_VIOLATION`
+- `Cannot access protected method` → `VISIBILITY_VIOLATION`
+- `Static call to instance method` → `STATIC_CALL_ERROR`
+</Accordion>
+
+<Accordion title="Null safety">
+- `on null` → `NULL_SAFETY`
+- `might be null` → `NULL_SAFETY`
+- `possibly null` → `NULL_SAFETY`
+</Accordion>
+
+## Severity determination
+
+PHPStan errors are assigned severity levels:
+
+- **ERROR** - Non-ignorable issues that will cause runtime failures
+- **WARNING** - Issues containing "deprecated", "unused", "might", or "possibly"
+- **INFO** - Suggestions and hints
+
+## Analysis levels
+
+PHPStan supports 10 analysis levels (0-9). Control strictness with the `--level` flag:
+
+```bash
+retina run --level 9  # Maximum strictness
+retina run -l 3       # Relaxed analysis
+```
+
+Or in `retina.yml`:
+
+```yaml
+level: 6  # Default
+```
+
+<Accordion title="What each level checks">
+- **Level 0** - Basic checks, minimal false positives
+- **Level 1** - Unknown classes, unknown methods called on $this
+- **Level 2** - Unknown methods on all expressions, validating PHPDocs
+- **Level 3** - Return types, types assigned to properties
+- **Level 4** - Dead code, unreachable code
+- **Level 5** - Checking types of arguments passed to methods
+- **Level 6** - Report missing typehints (default)
+- **Level 7** - Report partially wrong union types
+- **Level 8** - Report calling methods and accessing properties on nullable types
+- **Level 9** - Be strict about mixed type
+</Accordion>
+
+<Warning>
+Higher levels produce more accurate results but may report more issues. Start at level 6 and adjust based on your needs.
+</Warning>
+
+## PocketMine-MP stubs
+
+Retina includes PocketMine-MP type stubs that provide:
+
+- Accurate type information for PM API classes
+- Method signatures and return types
+- Property types
+- Constant definitions
+
+This prevents false positives when using PocketMine-MP APIs.
+
+## Example output
+
+```
+Parameter #1 $world of method Player::teleport() expects pocketmine\world\World, pocketmine\level\Level given.
+  File: src/Main.php:45
+  Category: PARAMETER_TYPE
+  Severity: ERROR
+  Fix: Update to use pocketmine\world\World instead of deprecated pocketmine\level\Level
+
+Method Main::handleData() has no return type specified.
+  File: src/Main.php:78
+  Category: OTHER
+  Severity: WARNING
+  Tip: Add return type to improve type safety
+```
+
+## Handling PHPStan not found
+
+If PHPStan is not installed, Retina reports:
+
+```
+PHPStan binary not found. Install PHPStan for enhanced static analysis: composer require --dev phpstan/phpstan
+  File: composer.json:1
+  Category: OTHER
+  Severity: INFO
+  Code: phpstan_not_found
+  Fix: Run: composer require --dev phpstan/phpstan
+```
+
+This is informational - Retina continues with other analyzers.
+
+## Handling analysis failures
+
+If PHPStan crashes or times out:
+
+```
+PHPStan analysis failed: Process timed out after 300 seconds
+  File: src:1
+  Category: OTHER
+  Severity: WARNING
+  Code: phpstan_analysis_failed
+  Fix: Check PHPStan configuration and ensure it is properly installed
+```
+
+## Configuration
+
+### Disable PHPStan analyzer
+
+In `retina.yml`:
+
+```yaml
+excludeAnalyzers:
+  - PHPStan
+```
+
+### Set analysis level
+
+```yaml
+level: 8
+```
+
+### Create custom PHPStan config
+
+If your plugin already has a `phpstan.neon` or `phpstan.neon.dist`, Retina will still generate its own temporary config to ensure PocketMine-MP stubs are loaded.
+
+To use your own config:
+
+1. Include Retina's stubs in your config:
+
+```yaml
+parameters:
+    scanDirectories:
+        - vendor/retina/stubs
+```
+
+2. Retina will respect your configuration when found.
+
+## Performance
+
+- PHPStan analysis can be slow on large plugins (30-300 seconds)
+- Results are worth the wait - PHPStan catches bugs other analyzers miss
+- Consider excluding PHPStan in CI for faster feedback, running it separately
+
+## When to use PHPStan analyzer
+
+<CardGroup cols={2}>
+  <Card title="Use when" icon="check">
+    - You want deep type checking
+    - You're refactoring complex code
+    - You're preparing for production
+    - You want to catch edge cases
+  </Card>
+  <Card title="Skip when" icon="xmark">
+    - You need fast analysis
+    - You're doing rapid prototyping
+    - You only want PM-specific checks
+    - CI pipeline is time-sensitive
+  </Card>
+</CardGroup>
+
+## Advanced usage
+
+### Ignore specific PHPStan errors
+
+Use PHPStan's inline ignore comments:
+
+```php
+// @phpstan-ignore-next-line
+$result = $this->riskyOperation();
+```
+
+Or in PHPStan config:
+
+```yaml
+parameters:
+    ignoreErrors:
+        - '#Call to an undefined method#'
+```
+
+### Custom PHPStan rules
+
+Install PHPStan extensions for additional checks:
+
+```bash
+composer require --dev phpstan/phpstan-strict-rules
+composer require --dev phpstan/phpstan-deprecation-rules
+```
+
+Then reference them in your `phpstan.neon`:
+
+```yaml
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+```
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Deprecated API analyzer" href="/analyzers/deprecated-api" icon="triangle-exclamation">
+    Detect PocketMine-MP API deprecations
+  </Card>
+  <Card title="Thread safety analyzer" href="/analyzers/thread-safety" icon="shield">
+    Find async task thread safety issues
+  </Card>
+  <Card title="PHPStan documentation" href="https://phpstan.org/" icon="book">
+    Learn more about PHPStan
+  </Card>
+</CardGroup>

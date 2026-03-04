@@ -1,0 +1,315 @@
+---
+title: Plugin.yml analyzer
+description: Validates the structure and content of plugin.yml manifest files
+---
+
+The Plugin.yml analyzer validates the structure, format, and content of your plugin's `plugin.yml` manifest file. It ensures all required fields are present and correctly formatted according to PocketMine-MP standards.
+
+## What it checks
+
+The analyzer performs comprehensive validation across multiple areas:
+
+### File existence and structure
+
+- Verifies that `plugin.yml` exists in the plugin root directory
+- Validates YAML syntax is correct and parseable
+- Ensures the file contains a YAML mapping (not a scalar or array)
+
+### Required fields
+
+The analyzer checks for all required fields:
+
+- `name` - Plugin identifier
+- `version` - Plugin version number
+- `main` - Fully-qualified main class name
+- `api` - PocketMine-MP API version(s)
+
+### Field validation
+
+Each field is validated according to specific rules:
+
+<Accordion title="Plugin name validation">
+
+- Must be a string type
+- Can only contain letters, numbers, hyphens, periods, underscores, and spaces
+- Warns if name contains spaces (discouraged)
+
+**Valid names:**
+```yaml
+name: MyPlugin
+name: my-plugin
+name: my_plugin
+```
+
+**Invalid names:**
+```yaml
+name: My@Plugin  # Special characters not allowed
+name: 123         # Number-only not recommended
+```
+
+</Accordion>
+
+<Accordion title="Version validation">
+
+- Must be a string or number
+- Should follow semantic versioning format (MAJOR.MINOR.PATCH)
+- Supports pre-release and build metadata
+
+**Valid versions:**
+```yaml
+version: 1.0.0
+version: 2.1.3-beta
+version: 1.0.0+build.123
+```
+
+**Invalid versions:**
+```yaml
+version: v1.0      # Should be numeric
+version: latest    # Not a version number
+```
+
+</Accordion>
+
+<Accordion title="Main class validation">
+
+- Must be a fully-qualified class name string
+- Must follow PHP namespace and class naming conventions
+- Must be a valid PHP identifier with backslash separators
+
+**Valid main class:**
+```yaml
+main: MyPlugin\Main
+main: Company\Plugin\PluginMain
+```
+
+**Invalid main class:**
+```yaml
+main: MyPlugin          # Missing namespace
+main: My-Plugin\Main    # Invalid characters
+main: 123\Plugin        # Cannot start with number
+```
+
+</Accordion>
+
+<Accordion title="API version validation">
+
+- Can be a string (single version) or array (multiple versions)
+- Must follow format: `X.Y.Z` (three-part semantic version)
+- Warns if using API version older than 4.0.0
+
+**Valid API versions:**
+```yaml
+api: 5.0.0
+api: [5.0.0, 4.0.0]
+```
+
+**Invalid API versions:**
+```yaml
+api: 5.0        # Missing patch version
+api: latest     # Not a version number
+```
+
+</Accordion>
+
+### Optional fields validation
+
+The analyzer also validates optional fields when present:
+
+<AccordionGroup>
+  <Accordion title="Commands">
+    
+  Each command must be a mapping with proper configuration:
+  
+  ```yaml
+  commands:
+    mycommand:
+      description: My command description
+      usage: /mycommand <args>
+      permission: myplugin.command.mycommand
+  ```
+  
+  **Issue detected:**
+  ```yaml
+  commands:
+    mycommand: simple_string  # Error: must be a mapping
+  ```
+  
+  </Accordion>
+  
+  <Accordion title="Permissions">
+    
+  Permission default values must be valid:
+  
+  - `op` - Operator only
+  - `notop` - Non-operators only
+  - `true` - Everyone
+  - `false` - Nobody
+  
+  ```yaml
+  permissions:
+    myplugin.command:
+      description: Use plugin commands
+      default: op
+  ```
+  
+  **Issue detected:**
+  ```yaml
+  permissions:
+    myplugin.command:
+      default: admin  # Error: invalid value
+  ```
+  
+  </Accordion>
+  
+  <Accordion title="Dependencies">
+    
+  All dependency types must be strings or arrays of strings:
+  
+  - `depend` - Hard dependencies (required)
+  - `softdepend` - Soft dependencies (optional)
+  - `loadbefore` - Load order dependencies
+  
+  ```yaml
+  depend:
+    - EconomyAPI
+    - PermissionsEx
+  
+  softdepend: [WorldProtect]
+  ```
+  
+  **Issue detected:**
+  ```yaml
+  depend:
+    - 123  # Error: must be string
+  ```
+  
+  </Accordion>
+  
+  <Accordion title="Load order">
+    
+  The `load` field controls when the plugin loads:
+  
+  - `STARTUP` - Load during server startup
+  - `POSTWORLD` - Load after worlds are loaded
+  
+  ```yaml
+  load: POSTWORLD
+  ```
+  
+  **Issue detected:**
+  ```yaml
+  load: EARLY  # Error: invalid value
+  ```
+  
+  </Accordion>
+</AccordionGroup>
+
+## Issues detected
+
+The analyzer reports issues across multiple severity levels:
+
+### Error severity
+
+<Warning>
+These issues will prevent your plugin from loading.
+</Warning>
+
+- Missing `plugin.yml` file
+- YAML syntax errors
+- Missing required fields
+- Invalid field types or formats
+- Invalid main class format
+- Invalid API version format
+- Invalid permission or command configuration
+
+### Warning severity
+
+- Plugin name contains invalid characters
+- API version is outdated (< 4.0.0)
+
+### Info severity
+
+<Note>
+These are suggestions for improvement, not critical issues.
+</Note>
+
+- Plugin name contains spaces
+- Version doesn't follow semantic versioning
+
+## Code examples
+
+### Correct plugin.yml
+
+```yaml
+name: MyAwesomePlugin
+version: 1.0.0
+main: MyNamespace\MyPlugin\Main
+api: 5.0.0
+
+commands:
+  myplugin:
+    description: Main plugin command
+    usage: /myplugin <action>
+    permission: myplugin.command
+
+permissions:
+  myplugin.command:
+    description: Allow using plugin commands
+    default: op
+```
+
+### Common issues
+
+<CodeGroup>
+```yaml Missing required fields
+# Bad: Missing 'api' field
+name: MyPlugin
+version: 1.0.0
+main: MyPlugin\Main
+# Error: Required field 'api' is missing in plugin.yml
+```
+
+```yaml Invalid API version
+# Bad: Wrong format
+name: MyPlugin
+version: 1.0.0
+main: MyPlugin\Main
+api: 5.0  # Missing patch version
+# Error: Invalid API version format: '5.0'. Expected format: X.Y.Z
+```
+
+```yaml Invalid main class
+# Bad: Missing namespace
+name: MyPlugin
+version: 1.0.0
+main: Main  # Should be fully-qualified
+api: 5.0.0
+# Warning: Main class should use namespaces
+```
+
+```yaml Outdated API
+# Warning: Using old API
+name: MyPlugin
+version: 1.0.0
+main: MyPlugin\Main
+api: 3.0.0
+# Warning: API version 3.0.0 is outdated. Consider upgrading to API 5.x
+```
+</CodeGroup>
+
+## Fix suggestions
+
+When the analyzer finds issues, it provides actionable suggestions:
+
+| Issue | Suggestion |
+|-------|------------|
+| Missing plugin.yml | Create a plugin.yml file with required fields: name, version, main, api |
+| Missing required field | Add the 'field_name' field to plugin.yml |
+| Invalid main class format | Main class must be a valid fully-qualified PHP class name |
+| Name with spaces | Consider using hyphens or underscores instead of spaces |
+| Non-semver version | Consider using semantic versioning (MAJOR.MINOR.PATCH) |
+| Outdated API version | Update your plugin to use the latest PocketMine-MP API |
+
+<Note>
+The analyzer validates your plugin.yml at `src/Analyzer/PluginYmlAnalyzer.php:18-70`
+</Note>

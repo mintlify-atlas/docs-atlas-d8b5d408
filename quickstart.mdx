@@ -1,80 +1,524 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Run your first Retina scan in minutes and learn the essential workflow for analyzing PocketMine-MP plugins.
 ---
 
-## Get started in three steps
+## Your first scan
 
-Get your documentation site running locally and make your first customization.
+Let's scan your first PocketMine-MP plugin with Retina. This guide assumes you've already [installed Retina](/installation).
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Navigate to your plugin directory">
+    Open a terminal and change to your plugin's root directory:
+    
+    ```bash
+    cd /path/to/your/plugin
+    ```
+    
+    <Note>
+      Your plugin directory should contain a `plugin.yml` file. Retina will exit with an error if it doesn't find one.
+    </Note>
+  </Step>
+  
+  <Step title="Run your first scan">
+    Execute the scan command:
+    
+    ```bash
+    retina run
+    ```
+    
+    Retina will:
+    - Validate your `plugin.yml` file
+    - Analyze all PHP files in your plugin
+    - Check for errors, deprecated API usage, and thread safety issues
+    - Display a summary in your terminal
+    - Generate a `retina-report.md` file
+    
+    <CodeGroup>
+      ```bash Scan current directory
+      retina run
+      ```
+      
+      ```bash Scan specific directory
+      retina run /path/to/plugin
+      ```
+      
+      ```bash Scan with custom output
+      retina run -f html -o report.html
+      ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Review the results">
+    After the scan completes, you'll see a summary like this:
+    
+    ```
+    Retina - PocketMine-MP Plugin Scanner
+    Scanning: /path/to/your/plugin
+    
+    Analyzing plugin...
+    ✓ Found plugin.yml
+    ✓ Analyzing 45 PHP files
+    ✓ Running analyzers
+    
+    ⚠ Found 12 issue(s) in 5 file(s)
+    
+    Summary
+    ┌─────────────────────┬───────┐
+    │ Category            │ Count │
+    ├─────────────────────┼───────┤
+    │ deprecated_api      │ 7     │
+    │ unused_variable     │ 3     │
+    │ undefined_method    │ 2     │
+    └─────────────────────┴───────┘
+    
+    Total files scanned: 45
+    Total issues found: 12
+    
+    ✓ Report saved to: /path/to/your/plugin/retina-report.md
+    ```
+  </Step>
+  
+  <Step title="Open the detailed report">
+    Open the generated report to see detailed findings:
+    
+    ```bash
+    # macOS
+    open retina-report.md
+    
+    # Linux
+    xdg-open retina-report.md
+    
+    # Windows
+    start retina-report.md
+    ```
+    
+    The report includes:
+    - File paths and line numbers for each issue
+    - Code snippets showing the problem
+    - Severity levels (error, warning, info, hint)
+    - Suggestions for fixing the issue
+  </Step>
+</Steps>
+
+## Configure your project
+
+For ongoing use, create a configuration file to customize Retina's behavior:
+
+<Steps>
+  <Step title="Initialize configuration">
+    Create a `retina.yml` configuration file:
+    
+    ```bash
+    retina init
+    ```
+    
+    This creates a `retina.yml` file in your plugin directory with default settings.
+  </Step>
+  
+  <Step title="Customize settings">
+    Edit `retina.yml` to match your project's needs:
+    
+    ```yaml retina.yml
+    # Analysis strictness level (1-9, higher = stricter)
+    level: 6
+    
+    # Paths to scan (relative to plugin root)
+    paths:
+      - src
+    
+    # Paths to exclude from scanning
+    excludePaths:
+      - vendor
+      - tests
+    
+    # Default report format (md, json, txt, html)
+    reportFormat: md
+    
+    # Exclude specific issue categories
+    excludeCategories:
+      - unused_variable
+      - unused_import
+    
+    # Disable specific analyzers
+    excludeAnalyzers:
+      - DeprecatedApi
+    
+    # Exclude severity levels
+    excludeSeverities:
+      - info
+      - hint
+    ```
+    
+    <Note>
+      Configuration file settings can be overridden by command-line options. CLI flags take precedence.
+    </Note>
+  </Step>
+  
+  <Step title="Run with configuration">
+    Now when you run `retina run`, it will use your configuration:
+    
+    ```bash
+    retina run
+    ```
+    
+    The scan will respect all settings in `retina.yml`.
+  </Step>
+</Steps>
+
+## Common workflows
+
+### Quick console-only scan
+
+For rapid feedback without generating a file:
+
+```bash
+retina run --console-only
+# or
+retina run -c
+```
+
+### Generate HTML report for sharing
+
+Create an interactive web-based report:
+
+```bash
+retina run --format html --output report.html
+# or
+retina run -f html -o report.html
+```
+
+### Strict analysis for production
+
+Run a rigorous scan before releasing:
+
+```bash
+retina run --level 9 --format json --output results.json
+# or
+retina run -l 9 -f json -o results.json
+```
+
+### Focus on critical issues only
+
+Exclude minor issues to focus on errors and warnings:
+
+```bash
+retina run --exclude-severities info,hint
+```
+
+### Ignore unused code warnings
+
+Exclude all unused variable/import/parameter warnings:
+
+```bash
+retina run --exclude-categories unused
+```
+
+### Simple report for CI/CD
+
+Generate a minimal report without code snippets:
+
+```bash
+retina run --simple --format json --output ci-results.json
+# or
+retina run -s -f json -o ci-results.json
+```
+
+## Understanding command options
+
+Retina's `run` command supports numerous options for customization:
+
+### Output options
+
+<ParamField path="--format" type="string" default="md">
+  Output format: `md`, `json`, `txt`, or `html`
+  
+  ```bash
+  retina run -f json
+  ```
+</ParamField>
+
+<ParamField path="--output" type="string" default="retina-report.<format>">
+  Custom output file path
+  
+  ```bash
+  retina run -o custom-report.md
+  ```
+</ParamField>
+
+<ParamField path="--console-only" type="boolean">
+  Print to console only, don't create a file
+  
+  ```bash
+  retina run -c
+  ```
+</ParamField>
+
+<ParamField path="--simple" type="boolean">
+  Generate simplified report without code snippets
+  
+  ```bash
+  retina run -s
+  ```
+</ParamField>
+
+### Analysis options
+
+<ParamField path="--level" type="integer" default="6">
+  Analysis strictness level (1-9, higher = stricter)
+  
+  ```bash
+  retina run -l 8
+  ```
+</ParamField>
+
+<ParamField path="--no-progress" type="boolean">
+  Disable progress output during scanning
+  
+  ```bash
+  retina run --no-progress
+  ```
+</ParamField>
+
+### Filtering options
+
+<ParamField path="--exclude-categories" type="string">
+  Comma-separated list of issue categories to exclude. Use presets: `unused`, `undefined`, `pocketmine`
+  
+  ```bash
+  retina run --exclude-categories unused_variable,unused_import
+  retina run --exclude-categories unused,undefined
+  ```
+</ParamField>
+
+<ParamField path="--exclude-analyzers" type="string">
+  Comma-separated list of analyzers to disable
+  
+  ```bash
+  retina run --exclude-analyzers DeprecatedApi,ThreadSafety
+  ```
+</ParamField>
+
+<ParamField path="--exclude-severities" type="string">
+  Comma-separated list of severity levels to exclude
+  
+  ```bash
+  retina run --exclude-severities info,hint
+  ```
+</ParamField>
+
+## Report formats explained
+
+Retina supports four report formats, each suited for different use cases:
+
+<CardGroup cols={2}>
+  <Card title="Markdown (default)" icon="markdown">
+    **Best for**: Code review, documentation
+    
+    Human-readable format with:
+    - Code snippets with syntax highlighting
+    - Severity badges
+    - Actionable suggestions
+    - Easy to read in GitHub, VS Code, or any Markdown viewer
+    
+    ```bash
+    retina run -f md
+    ```
+  </Card>
+  
+  <Card title="JSON" icon="brackets-curly">
+    **Best for**: CI/CD integration, automation
+    
+    Machine-readable format with:
+    - Structured issue data
+    - Easy parsing in scripts
+    - Integration with other tools
+    - Perfect for build pipelines
+    
+    ```bash
+    retina run -f json
+    ```
+  </Card>
+  
+  <Card title="HTML" icon="browser">
+    **Best for**: Sharing, presentations
+    
+    Interactive web-based report with:
+    - Filtering and search
+    - Sortable tables
+    - Click-to-expand details
+    - Professional appearance
+    
+    ```bash
+    retina run -f html
+    ```
+  </Card>
+  
+  <Card title="Plain text" icon="file-lines">
+    **Best for**: Console output, logs
+    
+    Simple text format with:
+    - No formatting or colors
+    - Easy to grep/search
+    - Compatible with any text viewer
+    - Lightweight output
+    
+    ```bash
+    retina run -f txt
+    ```
+  </Card>
+</CardGroup>
+
+## Category presets
+
+Retina provides convenient presets to exclude multiple related categories at once:
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+  <Accordion title="unused preset">
+    Excludes all unused code warnings:
+    - `unused_variable`
+    - `unused_parameter`
+    - `unused_import`
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+    ```bash
+    retina run --exclude-categories unused
+    ```
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+  
+  <Accordion title="undefined preset">
+    Excludes all undefined reference warnings:
+    - `undefined_variable`
+    - `undefined_method`
+    - `undefined_class`
+    - `undefined_constant`
+    - `undefined_function`
+    - `undefined_property`
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+    ```bash
+    retina run --exclude-categories undefined
+    ```
+  </Accordion>
+  
+  <Accordion title="pocketmine preset">
+    Excludes all PocketMine-MP specific categories:
+    - `invalid_event_handler`
+    - `unregistered_listener`
+    - `invalid_plugin_yml`
+    - `deprecated_api`
+    - `async_task_misuse`
+    - `thread_safety`
+    - And more...
+    
+    ```bash
+    retina run --exclude-categories pocketmine
+    ```
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
+<Note>
+  You can combine presets and individual categories: `--exclude-categories unused,deprecated_api`
+</Note>
+
+## Tips and best practices
 
 <AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+  <Accordion title="Start with level 6">
+    The default strictness level of 6 provides a good balance. Start here and adjust:
+    - **Lower levels (1-5)**: Faster scans, fewer false positives, misses some issues
+    - **Higher levels (7-9)**: More thorough, slower, may report minor issues
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
+    ```bash
+    # Quick scan during development
+    retina run -l 4 -c
+    
+    # Thorough scan before release
+    retina run -l 9
+    ```
+  </Accordion>
+  
+  <Accordion title="Use configuration files for teams">
+    Commit `retina.yml` to your repository so all team members use the same settings:
+    
+    ```yaml retina.yml
+    level: 7
+    excludeCategories:
+      - unused_variable
+    excludeSeverities:
+      - hint
+    ```
+    
+    This ensures consistent code quality across your team.
+  </Accordion>
+  
+  <Accordion title="Integrate with CI/CD">
+    Add Retina to your continuous integration pipeline:
+    
+    ```yaml .github/workflows/analyze.yml
+    name: Static Analysis
+    on: [push, pull_request]
+    
+    jobs:
+      analyze:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v2
+          - name: Setup PHP
+            uses: shivammathur/setup-php@v2
+            with:
+              php-version: '8.1'
+          - name: Install Retina
+            run: |
+              curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+          - name: Run analysis
+            run: retina run -f json -o results.json
+          - name: Upload results
+            uses: actions/upload-artifact@v2
+            with:
+              name: analysis-results
+              path: results.json
+    ```
+  </Accordion>
+  
+  <Accordion title="Focus on errors first">
+    When starting with a legacy codebase, focus on critical issues:
+    
+    ```bash
+    # Only show errors and warnings
+    retina run --exclude-severities info,hint
+    ```
+    
+    Fix errors, then warnings, then gradually include info and hints.
+  </Accordion>
+  
+  <Accordion title="Use simple reports for large codebases">
+    For plugins with many files, simple reports are faster and easier to navigate:
+    
+    ```bash
+    retina run --simple
+    ```
+    
+    Simple reports show only:
+    - File path and line number
+    - Category and severity
+    - Error message
+    
+    No code snippets or suggestions (faster to generate and review).
   </Accordion>
 </AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Command reference" icon="terminal" href="/cli/run">
+    Detailed documentation for all Retina commands
+  </Card>
+  <Card title="Configuration guide" icon="gear" href="/guides/configuration">
+    Learn about all configuration options
+  </Card>
+  <Card title="Issue categories" icon="list" href="/concepts/issue-categories">
+    Complete list of detectable issue categories
+  </Card>
+  <Card title="Analyzers" icon="magnifying-glass" href="/concepts/analyzers">
+    Deep dive into Retina's 14 analyzers
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

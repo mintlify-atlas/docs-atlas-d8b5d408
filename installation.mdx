@@ -1,0 +1,225 @@
+---
+title: Installation
+description: Install Retina on macOS, Linux, or Windows to start analyzing your PocketMine-MP plugins.
+---
+
+## Requirements
+
+Before installing Retina, ensure you have the following installed:
+
+<CardGroup cols={3}>
+  <Card title="PHP 8.1+" icon="php">
+    Required for running Retina
+  </Card>
+  <Card title="Composer" icon="box">
+    For dependency management
+  </Card>
+  <Card title="Git" icon="git-alt">
+    For installation script
+  </Card>
+</CardGroup>
+
+<Note>
+  Retina requires **PHP 8.1 or higher**. Check your version with `php --version`
+</Note>
+
+## Install on macOS and Linux
+
+The easiest way to install Retina on macOS and Linux is using the automated installation script:
+
+<Steps>
+  <Step title="Run the installation script">
+    Execute the following command in your terminal:
+    
+    ```bash
+    curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+    ```
+    
+    This script will:
+    - Clone the Retina repository
+    - Install dependencies via Composer
+    - Add Retina to your system PATH
+  </Step>
+  
+  <Step title="Verify installation">
+    Check that Retina is installed correctly:
+    
+    ```bash
+    retina --version
+    ```
+    
+    You should see output similar to:
+    ```
+    Retina version 1.0.0 - PocketMine-MP Plugin Static Analyzer
+    ```
+  </Step>
+</Steps>
+
+## Install on Windows
+
+Windows users should manually install Retina using the following steps:
+
+<Steps>
+  <Step title="Clone the repository">
+    Open Command Prompt or PowerShell and clone the Retina repository:
+    
+    ```cmd
+    git clone https://github.com/chinmay505/retina.git
+    cd retina
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    Install the required Composer dependencies:
+    
+    ```cmd
+    composer install --no-dev --optimize-autoloader
+    ```
+    
+    <Note>
+      The `--no-dev` flag excludes development dependencies, and `--optimize-autoloader` improves performance.
+    </Note>
+  </Step>
+  
+  <Step title="Add to PATH">
+    You have two options to make Retina accessible from anywhere:
+    
+    **Option 1: Add bin directory to PATH**
+    
+    1. Copy the full path to the `bin` directory (e.g., `C:\retina\bin`)
+    2. Open System Properties → Advanced → Environment Variables
+    3. Edit the `Path` variable and add the bin directory path
+    
+    **Option 2: Create a batch file wrapper**
+    
+    Create a file named `retina.bat` in a directory that's already in your PATH:
+    
+    ```batch
+    @echo off
+    php "C:\path\to\retina\bin\retina" %*
+    ```
+    
+    Replace `C:\path\to\retina` with your actual installation path.
+  </Step>
+  
+  <Step title="Verify installation">
+    Open a new Command Prompt window and verify the installation:
+    
+    ```cmd
+    retina --version
+    ```
+    
+    You should see the Retina version information.
+  </Step>
+</Steps>
+
+## Manual installation (all platforms)
+
+If you prefer to install Retina manually or the automated scripts don't work:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/chinmay505/retina.git
+    cd retina
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    ```
+  </Step>
+  
+  <Step title="Configure PATH">
+    Add the `bin` directory to your system PATH, or create a symlink:
+    
+    ```bash
+    # Linux/macOS - create symlink
+    sudo ln -s /full/path/to/retina/bin/retina /usr/local/bin/retina
+    
+    # Or add to PATH in ~/.bashrc or ~/.zshrc
+    export PATH="/full/path/to/retina/bin:$PATH"
+    ```
+  </Step>
+  
+  <Step title="Verify installation">
+    ```bash
+    retina --version
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command not found after installation">
+    If you get a "command not found" error:
+    
+    1. Verify the `bin` directory is in your PATH:
+       ```bash
+       echo $PATH  # Linux/macOS
+       echo %PATH%  # Windows
+       ```
+    
+    2. For shell configuration changes, reload your shell:
+       ```bash
+       source ~/.bashrc  # or ~/.zshrc
+       ```
+    
+    3. Try running Retina directly:
+       ```bash
+       php /path/to/retina/bin/retina --version
+       ```
+  </Accordion>
+  
+  <Accordion title="Composer autoloader not found">
+    If you see "Composer autoloader not found":
+    
+    1. Ensure you ran `composer install` in the Retina directory:
+       ```bash
+       cd /path/to/retina
+       composer install --no-dev --optimize-autoloader
+       ```
+    
+    2. Verify the `vendor` directory exists and contains an `autoload.php` file
+  </Accordion>
+  
+  <Accordion title="PHP version errors">
+    If you get PHP version errors:
+    
+    1. Check your PHP version:
+       ```bash
+       php --version
+       ```
+    
+    2. Retina requires **PHP 8.1 or higher**. Update PHP if needed:
+       - macOS: `brew upgrade php`
+       - Linux: Use your package manager (apt, yum, etc.)
+       - Windows: Download from [php.net](https://www.php.net/downloads)
+  </Accordion>
+  
+  <Accordion title="Memory limit errors">
+    Retina sets a 2GB memory limit by default. If you encounter memory issues:
+    
+    1. Edit `bin/retina` and increase the limit:
+       ```php
+       ini_set('memory_limit', '4G');
+       ```
+    
+    2. Or set it via PHP configuration:
+       ```bash
+       php -d memory_limit=4G /path/to/retina/bin/retina run
+       ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Retina allocates 2GB of memory by default (see `bin/retina:6`). This ensures large plugins can be analyzed without running out of memory.
+</Warning>
+
+## Next steps
+
+<Card title="Quick start guide" icon="rocket" href="/quickstart">
+  Learn how to run your first scan and configure Retina for your project
+</Card>

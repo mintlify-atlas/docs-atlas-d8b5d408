@@ -1,0 +1,392 @@
+---
+title: Config analyzer
+description: Validates configuration file handling and usage patterns
+---
+
+The config analyzer validates how your plugin handles configuration files, checking for proper YAML syntax and correct usage of config methods.
+
+## What it checks
+
+This analyzer examines config file handling and validates:
+
+- YAML syntax in `config.yml`
+- Config method usage (`get`, `set`, `getNested`, `setNested`)
+- Missing method arguments
+- Default value provision
+- Config save operations
+
+## Issues detected
+
+### Invalid YAML syntax
+
+The analyzer validates that `resources/config.yml` has valid YAML syntax.
+
+<Warning>
+Invalid YAML will cause your plugin to fail on load.
+</Warning>
+
+**Incorrect config.yml:**
+```yaml
+# Bad indentation
+settings:
+  option1: value1
+ option2: value2  # Wrong indent!
+  
+# Missing space after colon
+name:value
+
+# Invalid list
+items
+  - item1
+  - item2
+```
+
+**Correct config.yml:**
+```yaml
+settings:
+  option1: value1
+  option2: value2
+  
+name: value
+
+items:
+  - item1
+  - item2
+```
+
+### Config get without key
+
+Calling `get()` or `getNested()` without a key argument is an error.
+
+**Incorrect:**
+```php
+$config = $this->getConfig();
+$value = $config->get(); // Missing key!
+```
+
+**Correct:**
+```php
+$config = $this->getConfig();
+$value = $config->get("setting-name");
+```
+
+### Missing default value
+
+It's recommended to provide default values when getting config values.
+
+<Note>
+Providing defaults prevents errors when config keys are missing or deleted by users.
+</Note>
+
+**Without default (risky):**
+```php
+$maxPlayers = $this->getConfig()->get("max-players");
+// Returns null if key doesn't exist
+```
+
+**With default (safe):**
+```php
+$maxPlayers = $this->getConfig()->get("max-players", 10);
+// Returns 10 if key doesn't exist
+```
+
+### Dynamic config keys
+
+Using dynamic/computed keys makes static analysis difficult.
+
+**Less ideal:**
+```php
+$key = "player-" . $player->getName();
+$data = $this->getConfig()->get($key);
+```
+
+**Better approach:**
+```php
+// Use nested structure
+$playerData = $this->getConfig()->getNested("players.{$player->getName()}");
+
+// Or use string literal for better analysis
+$data = $this->getConfig()->get("players")[$player->getName()] ?? null;
+```
+
+### Config set missing arguments
+
+The `set()` and `setNested()` methods require both key and value.
+
+**Incorrect:**
+```php
+$this->getConfig()->set("enabled"); // Missing value!
+```
+
+**Correct:**
+```php
+$this->getConfig()->set("enabled", true);
+$this->saveConfig();
+```
+
+### Config save notice
+
+The analyzer flags `saveConfig()` calls to ensure changes are intentional.
+
+```php
+public function updateSetting(string $key, mixed $value): void {
+    $this->getConfig()->set($key, $value);
+    $this->saveConfig(); // Intentional save
+}
+```
+
+## Config methods
+
+### Loading config
+
+```php
+class Main extends PluginBase {
+    
+    public function onEnable(): void {
+        // Save default config.yml from resources/
+        $this->saveDefaultConfig();
+        
+        // Access config
+        $config = $this->getConfig();
+    }
+}
+```
+
+### Reading values
+
+```php
+// Simple get
+$value = $this->getConfig()->get("setting", "default");
+
+// Nested path
+$value = $this->getConfig()->getNested("database.host", "localhost");
+
+// Get all config data
+$all = $this->getConfig()->getAll();
+
+// Check if key exists
+if ($this->getConfig()->exists("feature.enabled")) {
+    // Key exists
+}
+```
+
+### Writing values
+
+```php
+// Set a value
+$this->getConfig()->set("last-update", time());
+
+// Set nested value
+$this->getConfig()->setNested("database.port", 3306);
+
+// Remove a key
+$this->getConfig()->remove("old-setting");
+
+// Must save to persist changes
+$this->saveConfig();
+```
+
+### Reloading config
+
+```php
+public function reloadConfiguration(): void {
+    $this->reloadConfig();
+    $this->getLogger()->info("Config reloaded");
+}
+```
+
+## Example config.yml
+
+```yaml
+# Plugin settings
+settings:
+  enabled: true
+  debug-mode: false
+  language: en
+  
+# Database configuration
+database:
+  type: sqlite
+  host: localhost
+  port: 3306
+  username: root
+  password: ""
+  database: plugin_data
+  
+# Feature toggles
+features:
+  economy:
+    enabled: true
+    starting-balance: 100
+  chat:
+    enabled: true
+    format: "<{name}> {message}"
+  
+# Lists
+blocked-items:
+  - bedrock
+  - barrier
+  - command_block
+  
+# Messages
+messages:
+  welcome: "Welcome to the server!"
+  goodbye: "Thanks for playing!"
+```
+
+## Usage in code
+
+```php
+use pocketmine\plugin\PluginBase;
+
+class Main extends PluginBase {
+    
+    private bool $economyEnabled;
+    private int $startingBalance;
+    
+    public function onEnable(): void {
+        // Save default config if it doesn't exist
+        $this->saveDefaultConfig();
+        
+        // Load settings
+        $this->economyEnabled = $this->getConfig()->getNested(
+            "features.economy.enabled",
+            true
+        );
+        
+        $this->startingBalance = $this->getConfig()->getNested(
+            "features.economy.starting-balance",
+            100
+        );
+        
+        // Validate config
+        if ($this->startingBalance < 0) {
+            $this->getLogger()->warning("Invalid starting balance, using default");
+            $this->startingBalance = 100;
+        }
+    }
+    
+    public function isEconomyEnabled(): bool {
+        return $this->economyEnabled;
+    }
+    
+    public function getStartingBalance(): int {
+        return $this->startingBalance;
+    }
+    
+    public function updateLastSave(): void {
+        $this->getConfig()->set("last-save", date("Y-m-d H:i:s"));
+        $this->saveConfig();
+    }
+}
+```
+
+## Type-safe config access
+
+```php
+class ConfigManager {
+    
+    public function __construct(
+        private Config $config
+    ) {}
+    
+    public function getMaxPlayers(): int {
+        return (int) $this->config->get("max-players", 20);
+    }
+    
+    public function isDebugEnabled(): bool {
+        return (bool) $this->config->get("debug", false);
+    }
+    
+    public function getDatabaseHost(): string {
+        return (string) $this->config->getNested("database.host", "localhost");
+    }
+    
+    public function getBlockedItems(): array {
+        $items = $this->config->get("blocked-items", []);
+        return is_array($items) ? $items : [];
+    }
+}
+```
+
+## Best practices
+
+<Card title="Config best practices" icon="file-lines">
+  - Always use `saveDefaultConfig()` in `onEnable()`
+  - Provide default values for all `get()` calls
+  - Validate config values after loading
+  - Use clear, descriptive key names
+  - Document your config structure
+  - Use nested structures for organization
+  - Only call `saveConfig()` when necessary
+  - Consider config version migrations
+</Card>
+
+<Accordion title="Common config patterns">
+  **Simple toggles:**
+  ```yaml
+  enabled: true
+  debug: false
+  ```
+  
+  **Nested settings:**
+  ```yaml
+  database:
+    host: localhost
+    port: 3306
+  ```
+  
+  **Lists:**
+  ```yaml
+  allowed-worlds:
+    - world
+    - world_nether
+  ```
+  
+  **Key-value maps:**
+  ```yaml
+  ranks:
+    default: "Member"
+    vip: "VIP"
+    admin: "Admin"
+  ```
+</Accordion>
+
+## Config validation example
+
+```php
+class Main extends PluginBase {
+    
+    public function onEnable(): void {
+        $this->saveDefaultConfig();
+        
+        if (!$this->validateConfig()) {
+            $this->getLogger()->error("Invalid configuration!");
+            $this->getServer()->getPluginManager()->disablePlugin($this);
+            return;
+        }
+    }
+    
+    private function validateConfig(): bool {
+        $config = $this->getConfig();
+        
+        // Check required keys exist
+        $required = ["database.host", "database.port", "settings.enabled"];
+        foreach ($required as $key) {
+            if (!$config->exists($key)) {
+                $this->getLogger()->error("Missing config key: $key");
+                return false;
+            }
+        }
+        
+        // Validate value types
+        $port = $config->getNested("database.port");
+        if (!is_int($port) || $port < 1 || $port > 65535) {
+            $this->getLogger()->error("Invalid port number");
+            return false;
+        }
+        
+        return true;
+    }
+}
+```

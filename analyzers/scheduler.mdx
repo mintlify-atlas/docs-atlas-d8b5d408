@@ -1,0 +1,373 @@
+---
+title: Scheduler analyzer
+description: Validates scheduler usage and task implementations
+---
+
+The scheduler analyzer validates proper usage of PocketMine's task scheduler and checks for common mistakes in timing configurations.
+
+## What it checks
+
+This analyzer examines scheduler usage and validates:
+
+- Task class implementation (`onRun` method)
+- Method visibility
+- Scheduler method parameters (delays, periods)
+- Deprecated scheduler methods
+- Task timing configurations
+
+## Issues detected
+
+### Missing onRun method
+
+Task classes extending `Task` must implement the `onRun()` method.
+
+**Incorrect:**
+```php
+use pocketmine\scheduler\Task;
+
+class MyTask extends Task {
+    // Missing onRun()!
+}
+```
+
+**Correct:**
+```php
+class MyTask extends Task {
+    public function onRun(): void {
+        // Task logic here
+    }
+}
+```
+
+### Negative delay value
+
+Delay values for `scheduleDelayedTask()` cannot be negative.
+
+<Warning>
+Negative delays will cause errors or unexpected behavior.
+</Warning>
+
+**Incorrect:**
+```php
+$scheduler->scheduleDelayedTask($task, -20); // Error!
+```
+
+**Correct:**
+```php
+// Delay of 20 ticks (1 second)
+$scheduler->scheduleDelayedTask($task, 20);
+
+// Delay of 0 = next tick
+$scheduler->scheduleDelayedTask($task, 0);
+```
+
+### Invalid repeat period
+
+Repeating tasks must have a positive period (greater than 0).
+
+**Incorrect:**
+```php
+// Period of 0 is invalid
+$scheduler->scheduleRepeatingTask($task, 0);
+
+// Negative period is invalid
+$scheduler->scheduleRepeatingTask($task, -10);
+```
+
+**Correct:**
+```php
+// Repeat every second (20 ticks)
+$scheduler->scheduleRepeatingTask($task, 20);
+
+// Repeat every 5 seconds (100 ticks)
+$scheduler->scheduleRepeatingTask($task, 100);
+```
+
+### Very short repeat period
+
+Repeating tasks with periods less than 20 ticks (1 second) may impact performance.
+
+<Note>
+This is an informational warning. Consider if such high frequency is necessary.
+</Note>
+
+**Potentially problematic:**
+```php
+// Runs every tick - very frequent!
+$scheduler->scheduleRepeatingTask($task, 1);
+
+// Every 5 ticks - still very frequent
+$scheduler->scheduleRepeatingTask($task, 5);
+```
+
+**Better approach:**
+```php
+// Every second (20 ticks) - reasonable
+$scheduler->scheduleRepeatingTask($task, 20);
+
+// Every 3 seconds (60 ticks)
+$scheduler->scheduleRepeatingTask($task, 60);
+```
+
+### Deprecated scheduler methods
+
+Some scheduler methods are deprecated and should be replaced.
+
+**Deprecated:**
+```php
+// Old method
+$scheduler->addTask($task);
+
+// Deprecated async task scheduling
+$scheduler->scheduleAsyncTask($asyncTask);
+```
+
+**Use instead:**
+```php
+// New method
+$scheduler->scheduleTask($task);
+
+// For async tasks
+Server::getInstance()->getAsyncPool()->submitTask($asyncTask);
+```
+
+### Deprecated getHandler override
+
+Overriding `getHandler()` in task classes is deprecated.
+
+**Avoid:**
+```php
+class MyTask extends Task {
+    public function getHandler(): ?TaskHandler {
+        // Don't override this
+        return parent::getHandler();
+    }
+}
+```
+
+## Scheduler methods
+
+### Schedule immediate task
+
+Runs on the next server tick.
+
+```php
+class Main extends PluginBase {
+    public function onEnable(): void {
+        $task = new MyTask($this);
+        $this->getScheduler()->scheduleTask($task);
+    }
+}
+```
+
+### Schedule delayed task
+
+Runs after a specified delay.
+
+```php
+// Delay in ticks (20 ticks = 1 second)
+$delay = 20 * 5; // 5 seconds
+
+$this->getScheduler()->scheduleDelayedTask(
+    new MyTask($this),
+    $delay
+);
+```
+
+### Schedule repeating task
+
+Runs repeatedly at a fixed interval.
+
+```php
+// Period in ticks
+$period = 20; // Every 1 second
+
+$this->getScheduler()->scheduleRepeatingTask(
+    new MyTask($this),
+    $period
+);
+```
+
+### Schedule delayed repeating task
+
+Starts after a delay, then repeats.
+
+```php
+$delay = 20 * 10;  // Start after 10 seconds
+$period = 20 * 30; // Repeat every 30 seconds
+
+$this->getScheduler()->scheduleDelayedRepeatingTask(
+    new MyTask($this),
+    $delay,
+    $period
+);
+```
+
+## Task cancellation
+
+Tasks can be cancelled using the task handler.
+
+```php
+class Main extends PluginBase {
+    private ?TaskHandler $taskHandler = null;
+    
+    public function onEnable(): void {
+        $task = new MyTask($this);
+        $this->taskHandler = $this->getScheduler()->scheduleRepeatingTask($task, 20);
+    }
+    
+    public function stopTask(): void {
+        if ($this->taskHandler !== null) {
+            $this->taskHandler->cancel();
+        }
+    }
+    
+    public function onDisable(): void {
+        // Cancel all tasks automatically on plugin disable
+    }
+}
+```
+
+## Timing reference
+
+<Card title="Tick to time conversion" icon="clock">
+  - 1 tick = 50ms (0.05 seconds)
+  - 20 ticks = 1 second
+  - 200 ticks = 10 seconds
+  - 1200 ticks = 1 minute
+  - 72000 ticks = 1 hour
+</Card>
+
+## Complete examples
+
+### Simple repeating task
+
+```php
+use pocketmine\scheduler\Task;
+use pocketmine\plugin\PluginBase;
+
+class BroadcastTask extends Task {
+    
+    private PluginBase $plugin;
+    private string $message;
+    
+    public function __construct(PluginBase $plugin, string $message) {
+        $this->plugin = $plugin;
+        $this->message = $message;
+    }
+    
+    public function onRun(): void {
+        $this->plugin->getServer()->broadcastMessage($this->message);
+    }
+}
+
+// Usage in main class
+class Main extends PluginBase {
+    public function onEnable(): void {
+        // Broadcast every 5 minutes
+        $this->getScheduler()->scheduleRepeatingTask(
+            new BroadcastTask($this, "Don't forget to vote!"),
+            20 * 60 * 5 // 5 minutes
+        );
+    }
+}
+```
+
+### Auto-save task
+
+```php
+class AutoSaveTask extends Task {
+    
+    private Main $plugin;
+    
+    public function __construct(Main $plugin) {
+        $this->plugin = $plugin;
+    }
+    
+    public function onRun(): void {
+        // Save player data
+        $this->plugin->saveAllData();
+        
+        // Log the save
+        $this->plugin->getLogger()->info("Auto-saved player data");
+    }
+}
+
+// Start auto-save every 10 minutes
+$this->getScheduler()->scheduleRepeatingTask(
+    new AutoSaveTask($this),
+    20 * 60 * 10
+);
+```
+
+### Delayed action task
+
+```php
+class TeleportCountdownTask extends Task {
+    
+    private Player $player;
+    private Position $destination;
+    private int $countdown;
+    
+    public function __construct(Player $player, Position $dest, int $seconds) {
+        $this->player = $player;
+        $this->destination = $dest;
+        $this->countdown = $seconds;
+    }
+    
+    public function onRun(): void {
+        if (!$this->player->isOnline()) {
+            $this->getHandler()->cancel();
+            return;
+        }
+        
+        $this->countdown--;
+        
+        if ($this->countdown <= 0) {
+            $this->player->teleport($this->destination);
+            $this->player->sendMessage("Teleported!");
+            $this->getHandler()->cancel();
+        } else {
+            $this->player->sendMessage("Teleporting in {$this->countdown}...");
+        }
+    }
+}
+
+// Usage: Teleport after 5 second countdown
+$task = new TeleportCountdownTask($player, $destination, 5);
+$this->getScheduler()->scheduleRepeatingTask($task, 20); // Every second
+```
+
+## Best practices
+
+<Card title="Scheduler best practices" icon="check">
+  - Use appropriate timing (don't run too frequently)
+  - Cancel tasks when no longer needed
+  - Check if players/entities are still valid in task
+  - Use closures for simple one-time tasks
+  - Store TaskHandler to cancel later
+  - Clean up tasks in `onDisable()`
+  - Consider performance impact of frequent tasks
+</Card>
+
+<Accordion title="When to use each schedule method">
+  **scheduleTask()**
+  - One-time actions next tick
+  - Deferring work to next tick
+  - Quick follow-up actions
+  
+  **scheduleDelayedTask()**
+  - Actions after a specific time
+  - Delayed responses
+  - Timed events
+  
+  **scheduleRepeatingTask()**
+  - Continuous monitoring
+  - Periodic broadcasts
+  - Regular updates
+  - Auto-save systems
+  
+  **scheduleDelayedRepeatingTask()**
+  - Repeating tasks that shouldn't start immediately
+  - Startup delays before beginning repetition
+</Accordion>

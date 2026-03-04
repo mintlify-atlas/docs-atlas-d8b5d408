@@ -1,0 +1,714 @@
+---
+title: Troubleshooting
+description: Solutions to common issues when using Retina
+---
+
+This guide covers common problems you might encounter when using Retina and how to resolve them.
+
+## Installation issues
+
+### Command not found after installation
+
+**Problem:** Running `retina` after installation shows "command not found".
+
+<Steps>
+  <Step title="Check installation location">
+    Verify Retina was installed correctly:
+
+    ```bash
+    ls -la ~/.retina/bin/retina
+    ```
+  </Step>
+
+  <Step title="Add to PATH">
+    The installation script should add Retina to your PATH. If not, add it manually:
+
+    **Bash:**
+    ```bash
+    echo 'export PATH="$HOME/.retina/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+    **Zsh:**
+    ```bash
+    echo 'export PATH="$HOME/.retina/bin:$PATH"' >> ~/.zshrc
+    source ~/.zshrc
+    ```
+  </Step>
+
+  <Step title="Verify">
+    ```bash
+    retina --version
+    ```
+  </Step>
+</Steps>
+
+### PHP version mismatch
+
+**Problem:** Error message about PHP version requirements.
+
+```
+Retina requires PHP 8.1 or higher
+```
+
+<Steps>
+  <Step title="Check PHP version">
+    ```bash
+    php --version
+    ```
+  </Step>
+
+  <Step title="Update PHP">
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt-get update
+    sudo apt-get install php8.1-cli
+    ```
+
+    **macOS (Homebrew):**
+    ```bash
+    brew install php@8.1
+    ```
+  </Step>
+
+  <Step title="Set default PHP">
+    If you have multiple PHP versions:
+
+    ```bash
+    sudo update-alternatives --set php /usr/bin/php8.1
+    ```
+  </Step>
+</Steps>
+
+### Composer dependencies missing
+
+**Problem:** Errors about missing classes or autoloader.
+
+<Steps>
+  <Step title="Navigate to Retina directory">
+    ```bash
+    cd ~/.retina
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    ```
+  </Step>
+</Steps>
+
+## Configuration issues
+
+### "Invalid directory path specified"
+
+**Problem:** Retina can't find the plugin directory.
+
+<Accordion title="Solution">
+  Make sure you're running Retina from the plugin root directory or specifying the correct path:
+
+  ```bash
+  # Run from plugin root
+  cd /path/to/plugin
+  retina run
+
+  # Or specify path
+  retina run /path/to/plugin
+  ```
+
+  Verify the directory contains a `plugin.yml` file:
+
+  ```bash
+  ls -la plugin.yml
+  ```
+</Accordion>
+
+### "No plugin.yml found"
+
+**Problem:** Retina reports missing plugin.yml file.
+
+```
+No plugin.yml found in /path. Is this a PocketMine-MP plugin?
+```
+
+<Steps>
+  <Step title="Verify plugin structure">
+    PocketMine-MP plugins must have a `plugin.yml` in the root directory:
+
+    ```
+    my-plugin/
+    ├── plugin.yml    ← Must exist here
+    ├── src/
+    └── resources/
+    ```
+  </Step>
+
+  <Step title="Check file name">
+    The file must be named exactly `plugin.yml` (lowercase, with .yml extension).
+  </Step>
+
+  <Step title="Verify permissions">
+    ```bash
+    ls -la plugin.yml
+    chmod 644 plugin.yml
+    ```
+  </Step>
+</Steps>
+
+### Configuration file not being read
+
+**Problem:** Settings in `retina.yml` are being ignored.
+
+<Note>
+Command line options always override configuration file settings.
+</Note>
+
+<Steps>
+  <Step title="Check file location">
+    `retina.yml` must be in the plugin root directory:
+
+    ```bash
+    ls -la retina.yml
+    ```
+  </Step>
+
+  <Step title="Validate YAML syntax">
+    Use a YAML validator to check for syntax errors:
+
+    ```bash
+    php -r "print_r(yaml_parse_file('retina.yml'));"
+    ```
+  </Step>
+
+  <Step title="Check indentation">
+    YAML is sensitive to indentation. Use spaces, not tabs:
+
+    ```yaml
+    # Correct
+    paths:
+      - src
+      - lib
+
+    # Wrong (mixed tabs/spaces)
+    paths:
+    	- src
+      - lib
+    ```
+  </Step>
+</Steps>
+
+### Invalid category/analyzer names
+
+**Problem:** Error about invalid categories or analyzers.
+
+```
+Invalid category: unused_varible
+```
+
+<Warning>
+Category and analyzer names are case-sensitive and must match exactly.
+</Warning>
+
+**Common category names:**
+- `undefined_variable` (not `undefined_var`)
+- `unused_variable` (not `unused_var`)
+- `deprecated_api` (not `deprecatedApi`)
+- `thread_safety` (not `threadsafety`)
+
+**Valid analyzer names:**
+- `PluginYml`, `MainClass`, `PhpFile`
+- `EventHandler`, `Listener`, `Command`
+- `DeprecatedApi`, `ThreadSafety`, `PHPStan`
+
+See the [configuration guide](/guides/configuration) for complete lists.
+
+## Analysis issues
+
+### Memory limit errors
+
+**Problem:** PHP runs out of memory during analysis.
+
+```
+Fatal error: Allowed memory size of 134217728 bytes exhausted
+```
+
+<Steps>
+  <Step title="Increase PHP memory limit">
+    Run Retina with a higher memory limit:
+
+    ```bash
+    php -d memory_limit=512M ~/.retina/bin/retina run
+    ```
+  </Step>
+
+  <Step title="Update php.ini">
+    For a permanent fix, edit `php.ini`:
+
+    ```ini
+    memory_limit = 512M
+    ```
+
+    Find your php.ini:
+    ```bash
+    php --ini | grep "Loaded Configuration File"
+    ```
+  </Step>
+
+  <Step title="Exclude large directories">
+    Add large directories to `excludePaths`:
+
+    ```yaml
+    excludePaths:
+      - vendor
+      - node_modules
+      - build
+      - cache
+    ```
+  </Step>
+</Steps>
+
+### Scan takes too long
+
+**Problem:** Analysis is very slow on large plugins.
+
+<Tabs>
+  <Tab title="Exclude paths">
+    Exclude directories that don't need scanning:
+
+    ```yaml
+    excludePaths:
+      - vendor
+      - tests
+      - docs
+      - examples
+    ```
+  </Tab>
+
+  <Tab title="Disable analyzers">
+    Disable slow analyzers you don't need:
+
+    ```yaml
+    excludeAnalyzers:
+      - PHPStan  # PHPStan can be slow on large codebases
+    ```
+  </Tab>
+
+  <Tab title="Lower strictness">
+    Reduce the analysis level:
+
+    ```yaml
+    level: 4  # Faster but less thorough
+    ```
+  </Tab>
+
+  <Tab title="Limit scan paths">
+    Only scan specific directories:
+
+    ```yaml
+    paths:
+      - src  # Only scan source code
+    ```
+  </Tab>
+</Tabs>
+
+### False positives
+
+**Problem:** Retina reports issues that aren't actually problems.
+
+<Steps>
+  <Step title="Lower strictness level">
+    Higher levels produce more false positives:
+
+    ```yaml
+    level: 5  # More lenient
+    ```
+  </Step>
+
+  <Step title="Ignore specific errors">
+    Use `ignoreErrors` to suppress false positives:
+
+    ```yaml
+    ignoreErrors:
+      - "#Variable \$logger is never read#"
+      - "#Property.*is never read#"
+    ```
+  </Step>
+
+  <Step title="Exclude categories">
+    Exclude entire categories if they're problematic:
+
+    ```yaml
+    excludeCategories:
+      - unused_parameter  # Common false positive
+    ```
+  </Step>
+
+  <Step title="Use baseline">
+    For existing codebases with many false positives:
+
+    ```yaml
+    baseline: retina-baseline.neon
+    ```
+  </Step>
+</Steps>
+
+### Missing expected issues
+
+**Problem:** Retina doesn't catch issues you know exist.
+
+<Steps>
+  <Step title="Increase strictness level">
+    ```yaml
+    level: 8  # More thorough analysis
+    ```
+  </Step>
+
+  <Step title="Enable all rules">
+    Make sure the relevant rules are enabled:
+
+    ```yaml
+    rules:
+      deprecatedApiUsage: true
+      threadSafetyViolation: true
+      # ... enable other rules
+    ```
+  </Step>
+
+  <Step title="Check exclude filters">
+    Remove or adjust filters that might be hiding issues:
+
+    ```yaml
+    excludeCategories: []  # Remove all exclusions
+    excludeSeverities: []  # Show all severity levels
+    ```
+  </Step>
+
+  <Step title="Verify scan paths">
+    Ensure the file is in a scanned directory:
+
+    ```yaml
+    paths:
+      - src
+      - lib  # Make sure this includes the file
+    ```
+  </Step>
+</Steps>
+
+## Report generation issues
+
+### Empty or missing reports
+
+**Problem:** Report file isn't created or is empty.
+
+<Accordion title="Console-only mode enabled">
+  If you used `-c` or `--console-only`, no file is created:
+
+  ```bash
+  # This creates a file
+  retina run -f md -o report.md
+
+  # This doesn't
+  retina run -c
+  ```
+</Accordion>
+
+<Accordion title="Permission denied">
+  Check write permissions in the output directory:
+
+  ```bash
+  ls -la .
+  chmod 755 .
+  ```
+</Accordion>
+
+<Accordion title="No issues found">
+  Some formats only create files when issues are found. Use `--console-only` to verify:
+
+  ```bash
+  retina run -c
+  ```
+</Accordion>
+
+### Corrupted JSON output
+
+**Problem:** JSON report can't be parsed.
+
+<Steps>
+  <Step title="Validate JSON">
+    ```bash
+    jq . retina-report.json
+    ```
+  </Step>
+
+  <Step title="Check for mixed output">
+    If running with `--console-only` and redirecting, you might have mixed console output:
+
+    ```bash
+    # Wrong - mixes console output with JSON
+    retina run -f json -c > output.json
+
+    # Right - saves only JSON
+    retina run -f json -o output.json
+    ```
+  </Step>
+
+  <Step title="Use simple format">
+    Simple format is smaller and less prone to issues:
+
+    ```bash
+    retina run -f json -s -o output.json
+    ```
+  </Step>
+</Steps>
+
+### HTML report not displaying properly
+
+**Problem:** HTML report shows unstyled content or doesn't render.
+
+<Steps>
+  <Step title="Check file encoding">
+    Ensure the file is UTF-8 encoded:
+
+    ```bash
+    file retina-report.html
+    ```
+  </Step>
+
+  <Step title="Try different browser">
+    Some browsers have strict local file policies. Try:
+    - Opening in a different browser
+    - Serving via a local web server:
+
+    ```bash
+    php -S localhost:8000
+    # Then visit http://localhost:8000/retina-report.html
+    ```
+  </Step>
+
+  <Step title="Check for truncation">
+    Ensure the file was completely written:
+
+    ```bash
+    tail -n 20 retina-report.html
+    # Should end with </html>
+    ```
+  </Step>
+</Steps>
+
+## CI/CD issues
+
+### Exit code always 0 or always 1
+
+**Problem:** Retina's exit code doesn't match expected results.
+
+<Note>
+Retina returns exit code 1 if ANY issues are found, regardless of severity.
+</Note>
+
+<Steps>
+  <Step title="Filter issues for CI">
+    Exclude low-severity issues to control when builds fail:
+
+    ```bash
+    retina run --exclude-severities=hint,info
+    ```
+  </Step>
+
+  <Step title="Use continue-on-error">
+    Allow the pipeline to continue:
+
+    ```yaml
+    - name: Run Retina
+      continue-on-error: true
+      run: retina run
+    ```
+  </Step>
+
+  <Step title="Parse JSON for custom logic">
+    Extract specific metrics and decide when to fail:
+
+    ```bash
+    ERRORS=$(jq '.summary.bySeverity.error // 0' retina-report.json)
+    if [ "$ERRORS" -gt 0 ]; then
+      exit 1
+    fi
+    ```
+  </Step>
+</Steps>
+
+### Installation fails in CI
+
+**Problem:** Can't install Retina in CI environment.
+
+<Accordion title="Missing dependencies">
+  Install required packages first:
+
+  ```yaml
+  - name: Install dependencies
+    run: apt-get update && apt-get install -y git curl php8.1-cli
+  ```
+</Accordion>
+
+<Accordion title="Permission issues">
+  Use a writable directory:
+
+  ```bash
+  curl -sSL https://raw.githubusercontent.com/chinmay505/retina/main/install.sh | bash
+  export PATH="$HOME/.retina/bin:$PATH"
+  ```
+</Accordion>
+
+<Accordion title="Network restrictions">
+  If the CI environment blocks external downloads:
+
+  1. Pre-install Retina in a Docker image
+  2. Cache the installation
+  3. Include Retina in your repository
+</Accordion>
+
+### Reports not uploaded as artifacts
+
+**Problem:** CI doesn't save or display reports.
+
+<Steps>
+  <Step title="Use when: always">
+    Ensure artifacts are uploaded even on failure:
+
+    ```yaml
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: retina-report
+        path: retina-report.json
+    ```
+  </Step>
+
+  <Step title="Verify report was created">
+    Add a verification step:
+
+    ```yaml
+    - name: Verify report exists
+      run: |
+        if [ ! -f retina-report.json ]; then
+          echo "Report not created!"
+          exit 1
+        fi
+    ```
+  </Step>
+
+  <Step title="Check artifact paths">
+    Ensure the path matches where Retina creates the file:
+
+    ```yaml
+    # Default location
+    path: retina-report.md
+
+    # Custom location
+    path: custom/path/report.json
+    ```
+  </Step>
+</Steps>
+
+## Performance issues
+
+### High memory usage
+
+**Problem:** Retina uses too much RAM.
+
+<Steps>
+  <Step title="Use simple reports">
+    Simple reports use less memory:
+
+    ```yaml
+    simpleReport: true
+    ```
+  </Step>
+
+  <Step title="Exclude large files">
+    ```yaml
+    excludePaths:
+      - vendor
+      - node_modules
+      - "*.min.php"
+    ```
+  </Step>
+
+  <Step title="Lower strictness">
+    Lower levels require less memory:
+
+    ```yaml
+    level: 4
+    ```
+  </Step>
+</Steps>
+
+### Slow on Windows
+
+**Problem:** Retina is significantly slower on Windows.
+
+<Note>
+Windows file I/O is generally slower than Unix systems. This is expected.
+</Note>
+
+<Steps>
+  <Step title="Exclude Windows Defender">
+    Add the plugin directory to Windows Defender exclusions.
+  </Step>
+
+  <Step title="Use WSL2">
+    For better performance, run Retina in WSL2:
+
+    ```bash
+    wsl
+    cd /mnt/c/path/to/plugin
+    retina run
+    ```
+  </Step>
+
+  <Step title="Disable real-time scanning">
+    Temporarily disable antivirus during analysis.
+  </Step>
+</Steps>
+
+## Getting help
+
+If you're still experiencing issues:
+
+<Steps>
+  <Step title="Enable verbose output">
+    Run with verbose flag for more details:
+
+    ```bash
+    retina run -v
+    ```
+  </Step>
+
+  <Step title="Check the logs">
+    Look for error messages in the console output.
+  </Step>
+
+  <Step title="Create a minimal reproduction">
+    Try running Retina on a simple test plugin to isolate the issue.
+  </Step>
+
+  <Step title="Report the issue">
+    If you've found a bug, report it on GitHub:
+
+    [https://github.com/chinmay505/retina/issues](https://github.com/chinmay505/retina/issues)
+
+    Include:
+    - Retina version (`retina --version`)
+    - PHP version (`php --version`)
+    - Operating system
+    - Command you ran
+    - Full error message
+    - Configuration file (if applicable)
+  </Step>
+</Steps>
+
+## See also
+
+- [Configuration](/guides/configuration) - Learn about all configuration options
+- [CI integration](/guides/ci-integration) - CI/CD specific troubleshooting
+- [Report formats](/guides/report-formats) - Understanding report output

@@ -1,0 +1,222 @@
+---
+title: retina init
+description: Initialize Retina configuration in a plugin directory
+---
+
+The `retina init` command creates a `retina.yml` configuration file in your plugin directory with customizable analysis settings.
+
+## Basic usage
+
+```bash
+retina init
+```
+
+This creates a `retina.yml` file in the current directory with default configuration.
+
+## Arguments
+
+<ParamField path="directory" type="string" default=".">
+  Path to the plugin directory where the configuration file should be created. If not specified, uses the current directory.
+  
+  ```bash
+  retina init /path/to/plugin
+  ```
+</ParamField>
+
+## Behavior
+
+<Accordion title="Configuration file exists">
+  If `retina.yml` already exists in the target directory, Retina will:
+  
+  1. Display a warning message
+  2. Ask for confirmation before overwriting
+  3. Preserve the existing file if you decline
+  
+  ```
+  ⚠ retina.yml already exists in this directory.
+  Do you want to overwrite it? (yes/no) [no]:
+  ```
+</Accordion>
+
+## Generated configuration
+
+The command creates a `retina.yml` file with the following structure:
+
+```yaml retina.yml
+# Retina Configuration
+# PocketMine-MP Plugin Static Analyzer
+
+# Analysis strictness level (1-9, higher = stricter)
+level: 6
+
+# Paths to scan (relative to plugin root)
+paths:
+  - src
+
+# Paths to exclude from scanning
+excludePaths:
+  - vendor
+  - tests
+
+# Default report format (md, json, txt, html)
+reportFormat: md
+
+# Generate simplified reports (default: false)
+simpleReport: false
+
+# Exclude specific issue categories from reports
+excludeCategories: []
+
+# Disable specific analyzers
+excludeAnalyzers: []
+
+# Exclude severity levels from reports
+excludeSeverities: []
+
+# Custom rules configuration
+rules:
+  # PHP Standard Rules
+  undefinedVariable: true
+  undefinedMethod: true
+  undefinedClass: true
+  # ... (see full configuration below)
+```
+
+## Configuration options
+
+After creating the file, Retina displays key configuration options:
+
+<ParamField path="level" type="integer" default="6">
+  Analysis strictness level (1-9). Higher values apply stricter rules.
+</ParamField>
+
+<ParamField path="paths" type="array">
+  Directories to scan, relative to the plugin root. Default: `["src"]`
+</ParamField>
+
+<ParamField path="excludePaths" type="array">
+  Directories to ignore during scanning. Default: `["vendor", "tests"]`
+</ParamField>
+
+<ParamField path="reportFormat" type="string" default="md">
+  Default output format: `md`, `json`, `txt`, or `html`
+</ParamField>
+
+<ParamField path="simpleReport" type="boolean" default="false">
+  Generate simplified reports without code snippets or suggestions
+</ParamField>
+
+<ParamField path="excludeCategories" type="array">
+  Issue categories to exclude from reports. Supports presets (`unused`, `undefined`, `pocketmine`) or individual categories.
+  
+  ```yaml
+  excludeCategories:
+    - unused_variable
+    - unused_import
+  ```
+</ParamField>
+
+<ParamField path="excludeAnalyzers" type="array">
+  Analyzers to disable during analysis.
+  
+  Available analyzers:
+  - `PluginYml`
+  - `MainClass`
+  - `PhpFile`
+  - `EventHandler`
+  - `Listener`
+  - `Command`
+  - `Permission`
+  - `AsyncTask`
+  - `Scheduler`
+  - `Config`
+  - `Resource`
+  - `DeprecatedApi`
+  - `ThreadSafety`
+  - `PHPStan`
+  
+  ```yaml
+  excludeAnalyzers:
+    - DeprecatedApi
+    - ThreadSafety
+  ```
+</ParamField>
+
+<ParamField path="excludeSeverities" type="array">
+  Severity levels to exclude from reports. Valid values: `error`, `warning`, `info`, `hint`
+  
+  ```yaml
+  excludeSeverities:
+    - info
+    - hint
+  ```
+</ParamField>
+
+<ParamField path="rules" type="object">
+  Enable or disable specific analysis rules. Each rule can be set to `true` or `false`.
+  
+  **PHP Standard Rules:**
+  - `undefinedVariable`
+  - `undefinedMethod`
+  - `undefinedClass`
+  - `undefinedConstant`
+  - `undefinedFunction`
+  - `typeMismatch`
+  - `unusedVariable`
+  - `unusedParameter`
+  - `unusedImport`
+  - `deadCode`
+  
+  **PocketMine-MP Specific Rules:**
+  - `invalidEventHandler`
+  - `unregisteredListener`
+  - `invalidPluginYml`
+  - `mainClassMismatch`
+  - `invalidApiVersion`
+  - `deprecatedApiUsage`
+  - `asyncTaskMisuse`
+  - `schedulerMisuse`
+  - `configMisuse`
+  - `permissionMismatch`
+  - `commandMismatch`
+  - `resourceMissing`
+  - `invalidEventPriority`
+  - `cancelledEventAccess`
+  - `threadSafetyViolation`
+</ParamField>
+
+<ParamField path="ignoreErrors" type="array">
+  Specific error codes to ignore
+</ParamField>
+
+<ParamField path="baseline" type="string">
+  PHPStan baseline file path for gradual adoption
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+```bash Initialize in current directory
+retina init
+```
+
+```bash Initialize in specific directory
+retina init /path/to/plugin
+```
+
+```bash Initialize and then run analysis
+retina init && retina run
+```
+</CodeGroup>
+
+## Next steps
+
+After creating the configuration file:
+
+1. Customize the settings in `retina.yml` to match your project needs
+2. Run `retina run` to perform analysis using your configuration
+3. Adjust rules and filters based on the results
+
+<Note>
+  CLI options passed to `retina run` will override settings from `retina.yml`.
+</Note>

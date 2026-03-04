@@ -1,0 +1,403 @@
+---
+title: Output options
+description: Configure how Retina generates and displays analysis reports
+---
+
+Retina provides flexible output options to control report format, destination, and verbosity. These options help you integrate Retina into different workflows, from interactive development to automated CI/CD pipelines.
+
+## Output format
+
+<ParamField path="--format" type="string" default="md">
+  Specifies the output format for generated reports.
+  
+  Available formats:
+  - `md` - Markdown (default)
+  - `json` - JSON structured data
+  - `txt` - Plain text
+  - `html` - HTML web-based report
+  
+  Short form: `-f`
+  
+  ```bash
+  retina run --format json
+  retina run -f html
+  ```
+</ParamField>
+
+### Format details
+
+<Accordion title="Markdown (md)">
+  Human-readable format with:
+  - Structured headings and sections
+  - Code snippets with syntax highlighting
+  - Issue severity indicators
+  - File paths with line numbers
+  - Suggestions for fixing issues
+  
+  Best for: Documentation, GitHub issues, code reviews
+  
+  ```bash
+  retina run --format md
+  retina run -f md
+  ```
+  
+  Default output file: `retina-report.md`
+</Accordion>
+
+<Accordion title="JSON (json)">
+  Machine-readable structured data with:
+  - Complete issue details
+  - File paths and line numbers
+  - Categories and severity levels
+  - Stack traces and metadata
+  - Summary statistics
+  
+  Best for: CI/CD integration, automated processing, custom tooling
+  
+  ```bash
+  retina run --format json
+  retina run -f json
+  ```
+  
+  Default output file: `retina-report.json`
+</Accordion>
+
+<Accordion title="Plain text (txt)">
+  Simple text format with:
+  - Linear issue listing
+  - File paths and line numbers
+  - Basic formatting
+  - No special characters
+  
+  Best for: Email reports, plain text editors, legacy systems
+  
+  ```bash
+  retina run --format txt
+  retina run -f txt
+  ```
+  
+  Default output file: `retina-report.txt`
+  
+  <Note>
+    The `text` alias also works: `retina run -f text`
+  </Note>
+</Accordion>
+
+<Accordion title="HTML (html)">
+  Interactive web-based report with:
+  - Clickable navigation
+  - Syntax-highlighted code snippets
+  - Filterable issue list
+  - Summary dashboard
+  - Responsive design
+  
+  Best for: Team sharing, presentations, browser-based viewing
+  
+  ```bash
+  retina run --format html
+  retina run -f html
+  ```
+  
+  Default output file: `retina-report.html`
+  
+  <Note>
+    The `web` alias also works: `retina run -f web`
+  </Note>
+</Accordion>
+
+## Output destination
+
+<ParamField path="--output" type="string">
+  Specifies the output file path for the generated report.
+  
+  If not specified, defaults to `retina-report.<format>` in the scanned plugin directory.
+  
+  Short form: `-o`
+  
+  ```bash
+  retina run --output custom-report.md
+  retina run -o /reports/analysis.json
+  ```
+</ParamField>
+
+### Output path behavior
+
+- Relative paths are resolved from the current working directory
+- Absolute paths are used as-is
+- Parent directories are created automatically if they don't exist
+- Existing files are overwritten without confirmation
+
+### Examples
+
+```bash
+# Save to specific file in current directory
+retina run --output my-analysis.md
+
+# Save to absolute path
+retina run --output /tmp/reports/plugin-check.json
+
+# Save to relative path with subdirectory
+retina run --output reports/latest.html
+
+# Combine with format option
+retina run --format json --output dist/analysis.json
+```
+
+<Note>
+  When using `--console-only`, the `--output` option is ignored since no file is generated.
+</Note>
+
+## Console output
+
+<ParamField path="--console-only" type="boolean">
+  Outputs analysis results to the console only without generating a report file.
+  
+  Short form: `-c`
+  
+  ```bash
+  retina run --console-only
+  retina run -c
+  ```
+</ParamField>
+
+### Console-only behavior
+
+- Summary statistics are displayed in the terminal
+- Issue count and affected file count are shown
+- No report file is generated
+- `--output` option is ignored
+- Exit code still indicates success (0) or failure (1)
+
+### Use cases
+
+<Accordion title="CI/CD pipelines">
+  Quick checks without generating files:
+  
+  ```bash
+  retina run --console-only --no-progress
+  ```
+  
+  Check exit code for pass/fail:
+  
+  ```bash
+  if retina run -c; then
+    echo "No issues found"
+  else
+    echo "Issues detected"
+    exit 1
+  fi
+  ```
+</Accordion>
+
+<Accordion title="Quick development checks">
+  Fast feedback during development:
+  
+  ```bash
+  retina run -c
+  ```
+</Accordion>
+
+<Accordion title="Disk space constraints">
+  Avoid creating report files in environments with limited storage:
+  
+  ```bash
+  retina run --console-only
+  ```
+</Accordion>
+
+## Report simplification
+
+<ParamField path="--simple" type="boolean">
+  Generates a simplified report without code snippets and fix suggestions.
+  
+  Simple reports include only:
+  - File path
+  - Line number
+  - Issue category
+  - Severity level
+  - Error message
+  
+  Short form: `-s`
+  
+  ```bash
+  retina run --simple
+  retina run -s
+  ```
+</ParamField>
+
+### Simple vs. standard reports
+
+**Standard report includes:**
+- File path and line number
+- Issue category and severity
+- Error message
+- Code snippet showing the problematic code
+- Contextual information
+- Suggestions for fixing the issue
+- Related documentation links
+
+**Simple report includes:**
+- File path and line number
+- Issue category and severity
+- Error message only
+
+### Use cases for simple reports
+
+<Accordion title="Large codebases">
+  Reduce report file size for projects with many issues:
+  
+  ```bash
+  retina run --simple --format json
+  ```
+</Accordion>
+
+<Accordion title="Automated parsing">
+  Easier to parse programmatically:
+  
+  ```bash
+  retina run --simple --format json --output results.json
+  ```
+</Accordion>
+
+<Accordion title="Overview generation">
+  Quick high-level overview without details:
+  
+  ```bash
+  retina run --simple --console-only
+  ```
+</Accordion>
+
+### Configuration file
+
+In `retina.yml`:
+
+```yaml
+simpleReport: true
+```
+
+<Note>
+  CLI `--simple` flag overrides the `simpleReport` configuration file setting.
+</Note>
+
+## Progress output
+
+<ParamField path="--no-progress" type="boolean">
+  Disables progress indicators during analysis.
+  
+  ```bash
+  retina run --no-progress
+  ```
+</ParamField>
+
+### Progress output includes:
+
+- File scanning progress
+- Analyzer execution status
+- Issue detection count (live updates)
+- Completion percentage
+
+### When to disable progress
+
+<Accordion title="CI/CD environments">
+  Progress output may clutter logs:
+  
+  ```bash
+  retina run --no-progress --console-only
+  ```
+</Accordion>
+
+<Accordion title="Log file redirection">
+  Clean output when redirecting to files:
+  
+  ```bash
+  retina run --no-progress > analysis.log 2>&1
+  ```
+</Accordion>
+
+<Accordion title="Scripted automation">
+  Avoid progress characters in automated scripts:
+  
+  ```bash
+  retina run --no-progress --format json --output report.json
+  ```
+</Accordion>
+
+## Combined examples
+
+<CodeGroup>
+```bash Standard markdown report
+retina run --format md --output report.md
+```
+
+```bash CI/CD integration
+retina run \
+  --format json \
+  --output results.json \
+  --no-progress \
+  --exclude-severities info,hint
+```
+
+```bash Quick console check
+retina run --console-only --no-progress
+```
+
+```bash Simplified HTML report
+retina run \
+  --format html \
+  --simple \
+  --output analysis.html
+```
+
+```bash Minimal JSON output
+retina run -f json -s -c
+```
+
+```bash Full-featured report
+retina run \
+  --format html \
+  --output reports/full-analysis.html \
+  --level 9
+```
+
+```bash Development workflow
+retina run -c -f txt
+```
+
+```bash Automated reporting
+retina run \
+  --format json \
+  --simple \
+  --output /var/reports/$(date +%Y%m%d).json \
+  --no-progress
+```
+</CodeGroup>
+
+## Default behavior
+
+When no output options are specified:
+
+```bash
+retina run
+```
+
+Defaults to:
+- Format: Markdown (`md`)
+- Output: `retina-report.md` in the scanned directory
+- Progress: Enabled
+- Simple: Disabled (full report with code snippets)
+- File generation: Enabled (not console-only)
+
+## Format extensions
+
+Retina automatically uses the correct file extension based on format:
+
+| Format | Extension |
+|--------|----------|
+| `md` | `.md` |
+| `json` | `.json` |
+| `txt` | `.txt` |
+| `html` | `.html` |
+
+<Warning>
+  If you specify a custom output file with `--output`, make sure the file extension matches your chosen format for proper handling by other tools.
+</Warning>

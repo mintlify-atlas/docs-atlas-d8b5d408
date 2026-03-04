@@ -1,0 +1,193 @@
+---
+title: Listener analyzer
+description: Checks listener classes for proper interface implementation and registration
+---
+
+The listener analyzer validates that listener classes properly implement the Listener interface and are registered with the server's event system.
+
+## What it checks
+
+This analyzer examines listener classes and validates:
+
+- Listener interface implementation
+- Listener registration via `registerEvents()`
+- Event handler method detection
+
+## Issues detected
+
+### Missing Listener interface
+
+Classes with event handlers must implement the `Listener` interface.
+
+<Warning>
+Without implementing `Listener`, your event handlers will not be recognized by PocketMine-MP.
+</Warning>
+
+**Incorrect:**
+```php
+use pocketmine\event\player\PlayerJoinEvent;
+
+class MyEventHandler {
+    public function onJoin(PlayerJoinEvent $event): void {
+        // This will never be called - missing Listener interface
+    }
+}
+```
+
+**Correct:**
+```php
+use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerJoinEvent;
+
+class MyEventHandler implements Listener {
+    public function onJoin(PlayerJoinEvent $event): void {
+        // Now this will work
+    }
+}
+```
+
+### Listener not registered
+
+Listeners must be registered with the server's plugin manager to receive events.
+
+<Note>
+This check may produce false positives if registration happens dynamically or in external classes.
+</Note>
+
+**Missing registration:**
+```php
+class Main extends PluginBase {
+    public function onEnable(): void {
+        // Listener exists but is never registered
+        // Events won't be received!
+    }
+}
+```
+
+**Correct registration:**
+```php
+class Main extends PluginBase {
+    public function onEnable(): void {
+        // Register the listener
+        $this->getServer()->getPluginManager()->registerEvents(
+            new MyEventHandler($this),
+            $this
+        );
+    }
+}
+```
+
+## How listeners are detected
+
+The analyzer scans your code for:
+
+1. Classes implementing `Listener` or any interface ending with `\Listener`
+2. Methods with parameters typed as event classes (containing `Event` in the type)
+3. Calls to `registerEvents()` method
+
+## Registration patterns
+
+The analyzer recognizes these registration patterns:
+
+### Direct instantiation
+
+```php
+public function onEnable(): void {
+    $this->getServer()->getPluginManager()->registerEvents(
+        new MyListener(),
+        $this
+    );
+}
+```
+
+### Variable registration
+
+```php
+public function onEnable(): void {
+    $listener = new MyListener($this);
+    $this->getServer()->getPluginManager()->registerEvents(
+        $listener,
+        $this
+    );
+}
+```
+
+### Self-registration
+
+```php
+class Main extends PluginBase implements Listener {
+    public function onEnable(): void {
+        // Main class is also a listener
+        $this->getServer()->getPluginManager()->registerEvents(
+            $this,
+            $this
+        );
+    }
+    
+    public function onPlayerJoin(PlayerJoinEvent $event): void {
+        // Event handler in main class
+    }
+}
+```
+
+## Best practices
+
+<Card title="Listener checklist" icon="check">
+  - Implement the `Listener` interface
+  - Register listeners in `onEnable()`
+  - Use dependency injection for plugin reference
+  - Keep listeners focused on specific event types
+  - Consider separate listener classes for different features
+</Card>
+
+## Complete example
+
+```php
+use pocketmine\plugin\PluginBase;
+use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerJoinEvent;
+use pocketmine\event\player\PlayerQuitEvent;
+
+// Listener class
+class PlayerListener implements Listener {
+    
+    private Main $plugin;
+    
+    public function __construct(Main $plugin) {
+        $this->plugin = $plugin;
+    }
+    
+    public function onJoin(PlayerJoinEvent $event): void {
+        $event->setJoinMessage("Welcome " . $event->getPlayer()->getName());
+    }
+    
+    public function onQuit(PlayerQuitEvent $event): void {
+        $event->setQuitMessage($event->getPlayer()->getName() . " left");
+    }
+}
+
+// Main class
+class Main extends PluginBase {
+    
+    public function onEnable(): void {
+        // Register the listener
+        $this->getServer()->getPluginManager()->registerEvents(
+            new PlayerListener($this),
+            $this
+        );
+    }
+}
+```
+
+## False positives
+
+<Accordion title="When might this analyzer produce false positives?">
+  The listener registration check may report false positives in these cases:
+  
+  - Dynamic registration based on configuration
+  - Registration in separate bootstrap/loader classes
+  - Conditional registration (e.g., only when certain features are enabled)
+  - Lazy loading of listeners
+  
+  If you're certain your listener is properly registered but still see warnings, you can safely ignore them.
+</Accordion>

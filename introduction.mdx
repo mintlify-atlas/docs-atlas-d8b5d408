@@ -1,0 +1,113 @@
+---
+title: Introduction
+description: Retina is a static analyzer for PocketMine-MP plugins that finds errors, deprecated API usage, thread safety issues, and other problems before you run your code.
+---
+
+## What is Retina?
+
+Retina is an open-source CLI-based static analyzer designed specifically for PocketMine-MP plugins. It scans your plugin code and identifies errors, deprecated API usage, thread safety issues, and other problems before you run it—helping you catch bugs early in development.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Comprehensive analysis" icon="magnifying-glass-chart">
+    Detects PHP standard issues, PocketMine-MP specific problems, and thread safety violations across your entire codebase.
+  </Card>
+  <Card title="Multiple report formats" icon="file-export">
+    Generate reports in Markdown, JSON, HTML, or plain text—perfect for both human review and CI/CD integration.
+  </Card>
+  <Card title="Configurable strictness" icon="sliders">
+    Adjust analysis levels from 1-9 to match your project's needs, from quick checks to rigorous validation.
+  </Card>
+  <Card title="Flexible filtering" icon="filter">
+    Exclude specific categories, analyzers, or severity levels to focus on what matters most to your project.
+  </Card>
+</CardGroup>
+
+## What Retina detects
+
+### PHP standard issues
+
+- **Type safety**: Undefined variables, methods, classes, constants, functions, and properties
+- **Type mismatches**: Parameter types, return types, and type compatibility errors
+- **Code quality**: Unused variables, parameters, imports, dead code, and syntax errors
+- **Inheritance problems**: Invalid inheritance, interface violations, abstract class issues
+- **Safety**: Null pointer issues, array access errors, static call problems
+
+### PocketMine-MP specific issues
+
+- **Plugin structure**: Invalid plugin.yml, main class mismatches, API version format errors
+- **Event handling**: Invalid event handler signatures, unregistered listeners, priority errors
+- **API usage**: Deprecated PocketMine-MP API detection, thread safety violations
+- **Resources**: AsyncTask misuse, scheduler problems, config handling errors
+- **Definitions**: Permission mismatches, command definition issues, missing resource files
+
+## Available analyzers
+
+Retina includes 14 specialized analyzers:
+
+<AccordionGroup>
+  <Accordion title="Core analyzers">
+    - **PluginYml**: Validates plugin.yml structure and required fields
+    - **MainClass**: Checks main class exists and extends PluginBase
+    - **PhpFile**: General PHP syntax and structure validation
+  </Accordion>
+  
+  <Accordion title="Feature analyzers">
+    - **EventHandler**: Validates event handler methods
+    - **Listener**: Checks listener registration
+    - **Command**: Validates command implementations
+    - **Permission**: Checks permission definitions
+  </Accordion>
+  
+  <Accordion title="Async and threading">
+    - **AsyncTask**: Detects AsyncTask misuse
+    - **Scheduler**: Validates scheduler usage
+    - **ThreadSafety**: Detects thread safety violations
+  </Accordion>
+  
+  <Accordion title="Resources and API">
+    - **Config**: Checks config file handling
+    - **Resource**: Validates resource file access
+    - **DeprecatedApi**: Finds deprecated PocketMine-MP API usage
+    - **PHPStan**: Runs PHPStan analysis
+  </Accordion>
+</AccordionGroup>
+
+## Who should use Retina?
+
+<CardGroup cols={3}>
+  <Card title="Plugin developers" icon="code">
+    Catch bugs before testing and ensure your code follows PocketMine-MP best practices.
+  </Card>
+  <Card title="Team leads" icon="users">
+    Maintain code quality across your team with automated checks and configurable standards.
+  </Card>
+  <Card title="CI/CD pipelines" icon="gears">
+    Integrate Retina into your build process with JSON output and machine-readable reports.
+  </Card>
+</CardGroup>
+
+## Severity levels
+
+Retina categorizes issues by severity to help you prioritize fixes:
+
+- **error**: Critical issues that will cause crashes or runtime failures
+- **warning**: Problems that should be fixed to prevent unexpected behavior
+- **info**: Suggestions for improvement and best practices
+- **hint**: Minor style or optimization suggestions
+
+<Note>
+  You can filter reports by severity level using `--exclude-severities` to focus on critical issues first.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Retina on macOS, Linux, or Windows
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Run your first scan in minutes
+  </Card>
+</CardGroup>

@@ -1,0 +1,380 @@
+---
+title: Analyzers
+description: Comprehensive guide to all 14 analyzers in Retina that scan your PocketMine-MP plugins for errors and issues
+---
+
+Retina includes 14 specialized analyzers that scan different aspects of your PocketMine-MP plugin. Each analyzer focuses on a specific area of plugin development to help you catch errors before runtime.
+
+## Core analyzers
+
+<CardGroup cols={2}>
+  <Card title="PluginYml" icon="file-code">
+    Validates plugin.yml structure and required fields
+  </Card>
+  <Card title="MainClass" icon="file-lines">
+    Checks main class exists and extends PluginBase
+  </Card>
+  <Card title="PhpFile" icon="php">
+    General PHP syntax and structure validation
+  </Card>
+  <Card title="EventHandler" icon="bolt">
+    Validates event handler methods
+  </Card>
+</CardGroup>
+
+### PluginYml analyzer
+
+Validates your `plugin.yml` configuration file for common errors and misconfigurations.
+
+**What it checks:**
+- Required fields: `name`, `version`, `main`, `api`
+- Plugin name format (alphanumeric, hyphens, periods, underscores, spaces)
+- Semantic versioning format
+- Valid fully-qualified class name for main class
+- API version format (X.Y.Z)
+- Command definitions structure
+- Permission definitions and default values
+- Dependency declarations (depend, softdepend, loadbefore)
+- Load timing values (STARTUP, POSTWORLD)
+
+**Example issues detected:**
+
+```yaml
+# Missing required field
+name: MyPlugin
+version: 1.0.0
+# ERROR: Required field 'main' is missing
+```
+
+```yaml
+# Invalid API version format
+api: 5.0  # ERROR: Expected format X.Y.Z (e.g., 5.0.0)
+```
+
+<Warning>
+Plugins with invalid plugin.yml files will fail to load. Fix all errors reported by this analyzer before testing your plugin.
+</Warning>
+
+### MainClass analyzer
+
+Verifies that your main class exists, is properly structured, and extends the required PocketMine-MP base class.
+
+**What it checks:**
+- Main class file exists at expected path (src/namespace/path)
+- Class FQCN matches plugin.yml declaration
+- Class is not abstract
+- Class extends `PluginBase` or implements `Plugin` interface
+- Lifecycle methods (onLoad, onEnable, onDisable) have correct visibility
+
+**Example issues detected:**
+
+```php
+// src/MyPlugin/Main.php
+namespace MyPlugin;
+
+class Main { // ERROR: Must extend PluginBase
+    // ...
+}
+```
+
+```php
+// Abstract main class
+abstract class Main extends PluginBase {
+    // ERROR: Main class must not be abstract
+}
+```
+
+### PhpFile analyzer
+
+Performs general PHP syntax and structure validation across all your plugin files.
+
+**What it checks:**
+- PHP syntax errors
+- File structure and organization
+- Basic code quality issues
+
+<Note>
+This analyzer works in conjunction with the PHPStan analyzer for comprehensive static analysis.
+</Note>
+
+### EventHandler analyzer
+
+Validates event handler methods to ensure they follow PocketMine-MP event handling conventions.
+
+**What it checks:**
+- Event handlers are public (not private or protected)
+- Event handlers are not static
+- Event handlers accept exactly one parameter (the event object)
+- Event priority annotations are valid (LOWEST, LOW, NORMAL, HIGH, HIGHEST, MONITOR)
+- MONITOR priority handlers have warnings about state modification
+- Proper use of `@handleCancelled` annotation
+
+**Example issues detected:**
+
+```php
+use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerJoinEvent;
+
+class MyListener implements Listener {
+    private function onJoin(PlayerJoinEvent $event) {
+        // ERROR: Event handler must be public
+    }
+    
+    public static function onQuit(PlayerQuitEvent $event) {
+        // ERROR: Event handler should not be static
+    }
+    
+    /**
+     * @priority INVALID
+     */
+    public function onChat(PlayerChatEvent $event) {
+        // ERROR: Invalid priority. Valid: LOWEST, LOW, NORMAL, HIGH, HIGHEST, MONITOR
+    }
+}
+```
+
+## PocketMine-MP specific analyzers
+
+<CardGroup cols={2}>
+  <Card title="Listener" icon="ear-listen">
+    Checks listener registration
+  </Card>
+  <Card title="Command" icon="terminal">
+    Validates command implementations
+  </Card>
+  <Card title="Permission" icon="shield">
+    Checks permission definitions
+  </Card>
+  <Card title="AsyncTask" icon="clock">
+    Detects AsyncTask misuse
+  </Card>
+</CardGroup>
+
+### Listener analyzer
+
+Checks that event listeners are properly registered with the server.
+
+**What it checks:**
+- Listener classes implement the `Listener` interface
+- Listeners are registered via `PluginManager->registerEvents()`
+- Event handler methods exist for registered listeners
+
+### Command analyzer
+
+Validates command implementations and their configuration.
+
+**What it checks:**
+- Commands declared in plugin.yml have corresponding implementations
+- Command classes extend `Command` or `PluginCommand`
+- Command execute methods have correct signatures
+
+### Permission analyzer
+
+Checks permission definitions and usage throughout your plugin.
+
+**What it checks:**
+- Permissions defined in plugin.yml have valid structure
+- Permission default values are valid (op, notop, true, false)
+- Permission checks in code reference defined permissions
+
+### AsyncTask analyzer
+
+Detects common mistakes when using AsyncTasks that can lead to crashes or thread safety issues.
+
+**What it checks:**
+- AsyncTask classes implement required `onRun()` method
+- `onRun()` method is public
+- Thread-unsafe method calls in `onRun()` (getServer, getPlugin, getPlayer, getWorld, getLevel)
+- Proper visibility of `onCompletion()` method
+- Correct usage of `storeLocal()` and `fetchLocal()` for data passing
+
+**Example issues detected:**
+
+```php
+use pocketmine\scheduler\AsyncTask;
+
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        $server = $this->getServer(); 
+        // ERROR: Thread-unsafe call to getServer() in AsyncTask::onRun()
+        // Do not access server/plugin/player/world objects in onRun()
+    }
+}
+```
+
+<Warning>
+Calling thread-unsafe methods in `onRun()` will cause crashes. Pass data through `storeLocal()` instead.
+</Warning>
+
+## Resource and configuration analyzers
+
+<CardGroup cols={2}>
+  <Card title="Scheduler" icon="clock">
+    Validates scheduler usage
+  </Card>
+  <Card title="Config" icon="gear">
+    Checks config file handling
+  </Card>
+  <Card title="Resource" icon="folder">
+    Validates resource file access
+  </Card>
+  <Card title="DeprecatedApi" icon="triangle-exclamation">
+    Finds deprecated PocketMine-MP API usage
+  </Card>
+</CardGroup>
+
+### Scheduler analyzer
+
+Validates proper use of the PocketMine-MP task scheduler.
+
+**What it checks:**
+- Tasks are scheduled correctly using scheduler methods
+- Task timing values are valid
+- Proper use of delayed, repeating, and delayed-repeating tasks
+
+### Config analyzer
+
+Checks configuration file handling for common errors.
+
+**What it checks:**
+- Config files are loaded correctly
+- Config keys are accessed safely
+- Default values are provided for missing keys
+
+### Resource analyzer
+
+Validates access to plugin resource files.
+
+**What it checks:**
+- Resource files referenced in code actually exist
+- Resources are accessed using correct methods
+- Resource paths are valid
+
+### DeprecatedApi analyzer
+
+Finds usage of deprecated PocketMine-MP APIs and suggests modern alternatives.
+
+**What it checks:**
+- Deprecated method calls (74+ deprecated methods tracked)
+- Deprecated class usage (8+ deprecated classes)
+- Deprecated constants
+- API version compatibility
+
+**Example deprecated APIs:**
+
+<Accordion title="Level → World migration (API 4.0.0)">
+```php
+// Deprecated (API 4.0.0)
+$level = $server->getLevel($name);
+$player->setLevel($level);
+
+// Use instead
+$world = $server->getWorldManager()->getWorldByName($name);
+$player->setWorld($world);
+```
+</Accordion>
+
+<Accordion title="Player methods (API 4.0.0+)">
+```php
+// Deprecated (API 4.0.0)
+$player->addTitle($title);
+$player->addSubTitle($subtitle);
+$player->sendPopup($message);  // Deprecated in API 5.0.0
+
+// Use instead
+$player->sendTitle($title);
+$player->sendSubTitle($subtitle);
+$player->sendToastNotification($message);  // API 5.0.0+
+```
+</Accordion>
+
+<Accordion title="AsyncTask data storage (API 5.0.0)">
+```php
+// Deprecated (API 5.0.0)
+$task->storeLocal($key, $data);
+$data = $task->fetchLocal($key);
+
+// Use instead
+private static array $data = [];
+// Store/retrieve via static class properties
+```
+</Accordion>
+
+<Note>
+The analyzer tracks deprecated APIs from PocketMine-MP API 3.x, 4.x, and 5.x to help you maintain compatibility.
+</Note>
+
+## Advanced analyzers
+
+<CardGroup cols={2}>
+  <Card title="ThreadSafety" icon="shield-halved">
+    Detects thread safety violations
+  </Card>
+  <Card title="PHPStan" icon="magnifying-glass">
+    Runs PHPStan analysis
+  </Card>
+</CardGroup>
+
+### ThreadSafety analyzer
+
+Detects code patterns that violate thread safety in PocketMine-MP's multi-threaded environment.
+
+**What it checks:**
+- Access to superglobals ($_SERVER, $_GET, $_POST, etc.) in async context
+- Static variable declarations in async methods
+- Static property access in async context
+- Use of `global` keyword (impacts testability and thread safety)
+
+**Example issues detected:**
+
+```php
+class MyTask extends AsyncTask {
+    public function onRun(): void {
+        $data = $_SERVER['HTTP_HOST'];
+        // ERROR: Access to superglobal $_SERVER in async context is thread-unsafe
+        
+        static $counter = 0;
+        // ERROR: Static variable declaration in async context is thread-unsafe
+    }
+}
+```
+
+### PHPStan analyzer
+
+Integrates with PHPStan for comprehensive static analysis of your PHP code.
+
+**What it checks:**
+- Type errors and mismatches
+- Undefined variables, methods, and properties
+- Return type violations
+- Parameter type errors
+- Dead code detection
+- And many more PHPStan checks
+
+<Note>
+This analyzer requires PHPStan to be installed. It provides the most comprehensive code analysis beyond PocketMine-MP specific checks.
+</Note>
+
+## Disabling analyzers
+
+You can disable specific analyzers using command-line options or configuration:
+
+```bash
+retina run --exclude-analyzers=DeprecatedApi,ThreadSafety
+```
+
+```yaml retina.yml
+excludeAnalyzers:
+  - DeprecatedApi
+  - ThreadSafety
+```
+
+<Warning>
+Disabling analyzers may cause you to miss important issues. Only disable analyzers if you have a specific reason and understand the implications.
+</Warning>
+
+## Related resources
+
+- [Issue categories](/concepts/issue-categories)
+- [Severity levels](/concepts/severity-levels)
+- [Filtering options](/concepts/filtering)
