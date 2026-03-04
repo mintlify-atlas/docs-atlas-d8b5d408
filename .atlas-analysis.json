@@ -1,0 +1,120 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Retina",
+  "projectDescription": "CLI-based static analysis and linter tool for PocketMine-MP plugins",
+  "theme": "aspen",
+  "primaryColor": "#242b2c",
+  "lightColor": "#040404",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/analyzers",
+              "concepts/issue-categories",
+              "concepts/severity-levels",
+              "concepts/filtering"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/report-formats",
+              "guides/ci-integration",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/run",
+              "cli/init"
+            ]
+          },
+          {
+            "group": "Options",
+            "pages": [
+              "cli/filtering-options",
+              "cli/output-options"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Analyzers",
+        "groups": [
+          {
+            "group": "Core Analyzers",
+            "pages": [
+              "analyzers/plugin-yml",
+              "analyzers/main-class",
+              "analyzers/php-file"
+            ]
+          },
+          {
+            "group": "PocketMine-MP Analyzers",
+            "pages": [
+              "analyzers/event-handler",
+              "analyzers/listener",
+              "analyzers/command",
+              "analyzers/permission",
+              "analyzers/async-task",
+              "analyzers/scheduler",
+              "analyzers/config",
+              "analyzers/resource"
+            ]
+          },
+          {
+            "group": "Advanced Analyzers",
+            "pages": [
+              "analyzers/deprecated-api",
+              "analyzers/thread-safety",
+              "analyzers/phpstan"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Static analysis for PocketMine-MP plugins",
+    "14 specialized analyzers covering plugin.yml, events, commands, async tasks, and more",
+    "Multiple report formats (Markdown, JSON, HTML, Text)",
+    "Configurable filtering by category, analyzer, and severity",
+    "PHPStan integration for advanced PHP analysis",
+    "Thread safety violation detection",
+    "Deprecated API usage detection",
+    "CI/CD integration support"
+  ],
+  "publicApiSurface": [
+    "retina run [directory]",
+    "retina init [directory]",
+    "--format, -f",
+    "--output, -o",
+    "--level, -l",
+    "--console-only, -c",
+    "--simple, -s",
+    "--no-progress",
+    "--exclude-categories",
+    "--exclude-analyzers",
+    "--exclude-severities"
+  ]
+}
